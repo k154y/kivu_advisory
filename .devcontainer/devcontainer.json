@@ -1,0 +1,40 @@
+{
+  "name": "Accounting Platform Dev Container",
+  "dockerComposeFile": "../docker-compose.dev.yml",
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "forwardPorts": [3000, 8080, 5432],
+  "portsAttributes": {
+    "3000": {
+      "label": "Next.js Frontend"
+    },
+    "8080": {
+      "label": "Go Backend API"
+    },
+    "5432": {
+      "label": "PostgreSQL Local Database"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "golang.Go",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens"
+      ],
+      "settings": {
+        "go.toolsManagement.autoUpdate": true,
+        "editor.formatOnSave": true,
+        "typescript.tsdk": "frontend/node_modules/typescript/lib",
+        "terminal.integrated.defaultProfile.linux": "bash"
+      }
+    }
+  },
+  "remoteUser": "vscode"
+}
