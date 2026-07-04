@@ -12,6 +12,8 @@ import (
 	"github.com/kyves/kivu-advisory/backend/internal/auth"
 	"github.com/kyves/kivu-advisory/backend/internal/client"
 	"github.com/kyves/kivu-advisory/backend/internal/config"
+	"github.com/kyves/kivu-advisory/backend/internal/consultation"
+	"github.com/kyves/kivu-advisory/backend/internal/document"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	"github.com/kyves/kivu-advisory/backend/internal/servicecatalog"
 	"github.com/kyves/kivu-advisory/backend/internal/servicerequest"
@@ -72,6 +74,14 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	assignmentRepository := assignment.NewPostgresRepository(options.DatabasePool)
 	assignmentService := assignment.NewService(assignmentRepository)
 
+	documentRepository := document.NewPostgresRepository(options.DatabasePool)
+	documentStorage := newDocumentStorage(options.Config)
+	documentAccessChecker := document.NewAccessChecker(serviceRequestRepository, assignmentRepository)
+	documentService := document.NewService(documentRepository, documentStorage, documentAccessChecker)
+
+	consultationRepository := consultation.NewPostgresRepository(options.DatabasePool)
+	consultationService := consultation.NewService(consultationRepository)
+
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -92,6 +102,8 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	serviceCatalogHandler := servicecatalog.NewHandler(serviceCatalogService)
 	serviceRequestHandler := servicerequest.NewHandler(serviceRequestService, clientService)
 	assignmentHandler := assignment.NewHandler(assignmentService)
+	documentHandler := document.NewHandler(documentService, clientService)
+	consultationHandler := consultation.NewHandler(consultationService)
 
 	auth.RegisterRoutes(
 		mux,
@@ -125,6 +137,20 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		mux,
 		options.Config.Server.APIBasePath,
 		assignmentHandler,
+		tokenManager,
+	)
+
+	document.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		documentHandler,
+		tokenManager,
+	)
+
+	consultation.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		consultationHandler,
 		tokenManager,
 	)
 
@@ -175,11 +201,18 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/accountant/assignments", notImplemented("accountant assignments route requires database connection"))
 		mux.HandleFunc(api+"/accountant/assignments/detail", notImplemented("accountant assignment detail route requires database connection"))
 		mux.HandleFunc(api+"/accountant/assignments/status", notImplemented("accountant assignment status route requires database connection"))
+
+		mux.HandleFunc(api+"/documents", notImplemented("documents route requires database connection"))
+		mux.HandleFunc(api+"/documents/detail", notImplemented("document detail route requires database connection"))
+		mux.HandleFunc(api+"/documents/download", notImplemented("document download route requires database connection"))
+
+		mux.HandleFunc(api+"/consultations", notImplemented("consultations route requires database connection"))
+		mux.HandleFunc(api+"/admin/consultations", notImplemented("admin consultations route requires database connection"))
+		mux.HandleFunc(api+"/admin/consultations/detail", notImplemented("admin consultation detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/consultations/status", notImplemented("admin consultation status route requires database connection"))
 	}
 
-	mux.HandleFunc(api+"/consultations", notImplemented("consultations route is not implemented yet"))
 	mux.HandleFunc(api+"/messages", notImplemented("messages route is not implemented yet"))
-	mux.HandleFunc(api+"/documents", notImplemented("documents route is not implemented yet"))
 
 	mux.HandleFunc(api+"/admin", notImplemented("admin route is not implemented yet"))
 	mux.HandleFunc(api+"/client", notImplemented("client route is not implemented yet"))
@@ -225,6 +258,41 @@ func methodOnly(method string, handler http.HandlerFunc) http.HandlerFunc {
 		}
 
 		handler(w, r)
+	}
+}
+
+func newDocumentStorage(cfg *config.Config) document.Storage {
+	if cfg == nil {
+		log.Println("document storage: local private storage")
+		return document.NewLocalStorage("", document.DefaultMaxUploadSizeBytes)
+	}
+
+	maxUploadSize := document.DefaultMaxUploadSizeBytes
+	if cfg.Upload.MaxSizeBytes > 0 {
+		maxUploadSize = cfg.Upload.MaxSizeBytes
+	}
+
+	switch cfg.Storage.Driver {
+	case config.StorageDriverR2:
+		r2Storage, err := document.NewR2Storage(document.R2StorageConfig{
+			Endpoint:        cfg.Storage.R2.Endpoint,
+			Bucket:          cfg.Storage.R2.BucketName,
+			AccessKeyID:     cfg.Storage.R2.AccessKeyID,
+			SecretAccessKey: cfg.Storage.R2.SecretAccessKey,
+			Region:          cfg.Storage.R2.Region,
+			MaxSizeBytes:    maxUploadSize,
+		})
+		if err != nil {
+			log.Printf("r2 storage unavailable, falling back to local storage: %v", err)
+			return document.NewLocalStorage(cfg.Storage.LocalUploadDir, maxUploadSize)
+		}
+
+		log.Println("document storage: cloudflare r2")
+		return r2Storage
+
+	default:
+		log.Println("document storage: local private storage")
+		return document.NewLocalStorage(cfg.Storage.LocalUploadDir, maxUploadSize)
 	}
 }
 
