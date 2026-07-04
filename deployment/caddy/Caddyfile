@@ -1,0 +1,26 @@
+{
+	email {$CADDY_EMAIL}
+}
+
+{$APP_DOMAIN} {
+	encode gzip zstd
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+
+	@blocked_upload_paths path /uploads* /storage* /tmp*
+	respond @blocked_upload_paths 404
+
+	@api path /api/*
+	reverse_proxy @api backend:8080
+
+	@health path /health
+	reverse_proxy @health backend:8080
+
+	reverse_proxy frontend:3000
+}

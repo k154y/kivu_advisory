@@ -1,20 +1,22 @@
 {
-  "name": "Accounting Platform Dev Container",
-  "dockerComposeFile": "../docker-compose.dev.yml",
-  "service": "app",
+  "name": "Kivu Advisory Workspace",
+  "dockerComposeFile": "../deployment/docker/docker-compose.dev.yml",
+  "service": "workspace",
   "workspaceFolder": "/workspace",
-  "forwardPorts": [3000, 8080, 5432],
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [
+    3000,
+    8080
+  ],
   "portsAttributes": {
     "3000": {
       "label": "Next.js Frontend"
     },
     "8080": {
       "label": "Go Backend API"
-    },
-    "5432": {
-      "label": "PostgreSQL Local Database"
     }
   },
+  "postCreateCommand": "cd /workspace/backend && go mod tidy && cd /workspace/frontend && npm install",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -30,8 +32,10 @@
       ],
       "settings": {
         "go.toolsManagement.autoUpdate": true,
+        "go.useLanguageServer": true,
+        "go.formatTool": "gofmt",
         "editor.formatOnSave": true,
-        "typescript.tsdk": "frontend/node_modules/typescript/lib",
+        "files.eol": "\n",
         "terminal.integrated.defaultProfile.linux": "bash"
       }
     }
