@@ -12,6 +12,7 @@ import (
 	"github.com/kyves/kivu-advisory/backend/internal/client"
 	"github.com/kyves/kivu-advisory/backend/internal/config"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
+	"github.com/kyves/kivu-advisory/backend/internal/servicecatalog"
 	"github.com/kyves/kivu-advisory/backend/internal/user"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
 )
@@ -60,6 +61,9 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	clientRepository := client.NewPostgresRepository(options.DatabasePool)
 	clientService := client.NewService(clientRepository)
 
+	serviceRepository := servicecatalog.NewPostgresRepository(options.DatabasePool)
+	serviceCatalogService := servicecatalog.NewService(serviceRepository)
+
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -77,6 +81,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 
 	authHandler := auth.NewHandler(authService)
 	clientHandler := client.NewHandler(clientService)
+	serviceCatalogHandler := servicecatalog.NewHandler(serviceCatalogService)
 
 	auth.RegisterRoutes(
 		mux,
@@ -89,6 +94,13 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		mux,
 		options.Config.Server.APIBasePath,
 		clientHandler,
+		tokenManager,
+	)
+
+	servicecatalog.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		serviceCatalogHandler,
 		tokenManager,
 	)
 
@@ -118,9 +130,14 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/client/profile", notImplemented("client profile route requires database connection"))
 		mux.HandleFunc(api+"/admin/clients", notImplemented("admin clients route requires database connection"))
 		mux.HandleFunc(api+"/admin/clients/detail", notImplemented("admin client detail route requires database connection"))
+
+		mux.HandleFunc(api+"/services", notImplemented("services route requires database connection"))
+		mux.HandleFunc(api+"/services/detail", notImplemented("service detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/services", notImplemented("admin services route requires database connection"))
+		mux.HandleFunc(api+"/admin/services/detail", notImplemented("admin service detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/services/status", notImplemented("admin service status route requires database connection"))
 	}
 
-	mux.HandleFunc(api+"/services", notImplemented("services route is not implemented yet"))
 	mux.HandleFunc(api+"/service-requests", notImplemented("service requests route is not implemented yet"))
 	mux.HandleFunc(api+"/consultations", notImplemented("consultations route is not implemented yet"))
 	mux.HandleFunc(api+"/messages", notImplemented("messages route is not implemented yet"))
