@@ -8,11 +8,13 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/kyves/kivu-advisory/backend/internal/assignment"
 	"github.com/kyves/kivu-advisory/backend/internal/auth"
 	"github.com/kyves/kivu-advisory/backend/internal/client"
 	"github.com/kyves/kivu-advisory/backend/internal/config"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	"github.com/kyves/kivu-advisory/backend/internal/servicecatalog"
+	"github.com/kyves/kivu-advisory/backend/internal/servicerequest"
 	"github.com/kyves/kivu-advisory/backend/internal/user"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
 )
@@ -64,6 +66,12 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	serviceRepository := servicecatalog.NewPostgresRepository(options.DatabasePool)
 	serviceCatalogService := servicecatalog.NewService(serviceRepository)
 
+	serviceRequestRepository := servicerequest.NewPostgresRepository(options.DatabasePool)
+	serviceRequestService := servicerequest.NewService(serviceRequestRepository)
+
+	assignmentRepository := assignment.NewPostgresRepository(options.DatabasePool)
+	assignmentService := assignment.NewService(assignmentRepository)
+
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -82,6 +90,8 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	authHandler := auth.NewHandler(authService)
 	clientHandler := client.NewHandler(clientService)
 	serviceCatalogHandler := servicecatalog.NewHandler(serviceCatalogService)
+	serviceRequestHandler := servicerequest.NewHandler(serviceRequestService, clientService)
+	assignmentHandler := assignment.NewHandler(assignmentService)
 
 	auth.RegisterRoutes(
 		mux,
@@ -101,6 +111,20 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		mux,
 		options.Config.Server.APIBasePath,
 		serviceCatalogHandler,
+		tokenManager,
+	)
+
+	servicerequest.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		serviceRequestHandler,
+		tokenManager,
+	)
+
+	assignment.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		assignmentHandler,
 		tokenManager,
 	)
 
@@ -136,9 +160,23 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/admin/services", notImplemented("admin services route requires database connection"))
 		mux.HandleFunc(api+"/admin/services/detail", notImplemented("admin service detail route requires database connection"))
 		mux.HandleFunc(api+"/admin/services/status", notImplemented("admin service status route requires database connection"))
+
+		mux.HandleFunc(api+"/service-requests", notImplemented("service requests route requires database connection"))
+		mux.HandleFunc(api+"/client/service-requests", notImplemented("client service requests route requires database connection"))
+		mux.HandleFunc(api+"/client/service-requests/detail", notImplemented("client service request detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/service-requests", notImplemented("admin service requests route requires database connection"))
+		mux.HandleFunc(api+"/admin/service-requests/detail", notImplemented("admin service request detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/service-requests/status", notImplemented("admin service request status route requires database connection"))
+		mux.HandleFunc(api+"/admin/service-requests/reference", notImplemented("admin service request reference route requires database connection"))
+
+		mux.HandleFunc(api+"/admin/assignments", notImplemented("admin assignments route requires database connection"))
+		mux.HandleFunc(api+"/admin/assignments/detail", notImplemented("admin assignment detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/assignments/status", notImplemented("admin assignment status route requires database connection"))
+		mux.HandleFunc(api+"/accountant/assignments", notImplemented("accountant assignments route requires database connection"))
+		mux.HandleFunc(api+"/accountant/assignments/detail", notImplemented("accountant assignment detail route requires database connection"))
+		mux.HandleFunc(api+"/accountant/assignments/status", notImplemented("accountant assignment status route requires database connection"))
 	}
 
-	mux.HandleFunc(api+"/service-requests", notImplemented("service requests route is not implemented yet"))
 	mux.HandleFunc(api+"/consultations", notImplemented("consultations route is not implemented yet"))
 	mux.HandleFunc(api+"/messages", notImplemented("messages route is not implemented yet"))
 	mux.HandleFunc(api+"/documents", notImplemented("documents route is not implemented yet"))

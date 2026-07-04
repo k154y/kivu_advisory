@@ -170,3 +170,4 @@ func bearerToken(r *http.Request) string {
 
 	return strings.TrimSpace(parts[1])
 }
+
