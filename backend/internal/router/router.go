@@ -14,6 +14,7 @@ import (
 	"github.com/kyves/kivu-advisory/backend/internal/config"
 	"github.com/kyves/kivu-advisory/backend/internal/consultation"
 	"github.com/kyves/kivu-advisory/backend/internal/document"
+	"github.com/kyves/kivu-advisory/backend/internal/message"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	"github.com/kyves/kivu-advisory/backend/internal/servicecatalog"
 	"github.com/kyves/kivu-advisory/backend/internal/servicerequest"
@@ -82,6 +83,9 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	consultationRepository := consultation.NewPostgresRepository(options.DatabasePool)
 	consultationService := consultation.NewService(consultationRepository)
 
+	messageRepository := message.NewPostgresRepository(options.DatabasePool)
+	messageService := message.NewService(messageRepository, documentAccessChecker)
+
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -104,6 +108,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	assignmentHandler := assignment.NewHandler(assignmentService)
 	documentHandler := document.NewHandler(documentService, clientService)
 	consultationHandler := consultation.NewHandler(consultationService)
+	messageHandler := message.NewHandler(messageService, clientService)
 
 	auth.RegisterRoutes(
 		mux,
@@ -151,6 +156,13 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		mux,
 		options.Config.Server.APIBasePath,
 		consultationHandler,
+		tokenManager,
+	)
+
+	message.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		messageHandler,
 		tokenManager,
 	)
 
@@ -210,9 +222,11 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/admin/consultations", notImplemented("admin consultations route requires database connection"))
 		mux.HandleFunc(api+"/admin/consultations/detail", notImplemented("admin consultation detail route requires database connection"))
 		mux.HandleFunc(api+"/admin/consultations/status", notImplemented("admin consultation status route requires database connection"))
-	}
 
-	mux.HandleFunc(api+"/messages", notImplemented("messages route is not implemented yet"))
+		mux.HandleFunc(api+"/messages", notImplemented("messages route requires database connection"))
+		mux.HandleFunc(api+"/messages/detail", notImplemented("message detail route requires database connection"))
+		mux.HandleFunc(api+"/messages/read", notImplemented("message read route requires database connection"))
+	}
 
 	mux.HandleFunc(api+"/admin", notImplemented("admin route is not implemented yet"))
 	mux.HandleFunc(api+"/client", notImplemented("client route is not implemented yet"))
