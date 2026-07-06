@@ -67,7 +67,7 @@ type PublicServiceRequest struct {
 	Status                 string     `json:"status"`
 	Priority               string     `json:"priority"`
 	PreferredContactMethod string     `json:"preferred_contact_method,omitempty"`
-	ExpectedDeadline       *time.Time  `json:"expected_deadline,omitempty"`
+	ExpectedDeadline       *time.Time `json:"expected_deadline,omitempty"`
 	Source                 string     `json:"source"`
 	AdminNotes             string     `json:"admin_notes,omitempty"`
 	InternalNotes          string     `json:"internal_notes,omitempty"`

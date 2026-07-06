@@ -21,19 +21,19 @@ const (
 )
 
 type Assignment struct {
-	ID                string
-	ServiceRequestID  string
-	AccountantUserID  string
-	AssignedByUserID  string
-	Status            string
-	Priority          string
-	DueDate           *time.Time
-	StartedAt         *time.Time
-	CompletedAt       *time.Time
-	Notes             string
-	InternalNotes     string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID               string
+	ServiceRequestID string
+	AccountantUserID string
+	AssignedByUserID string
+	Status           string
+	Priority         string
+	DueDate          *time.Time
+	StartedAt        *time.Time
+	CompletedAt      *time.Time
+	Notes            string
+	InternalNotes    string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type PublicAssignment struct {
@@ -43,9 +43,9 @@ type PublicAssignment struct {
 	AssignedByUserID string     `json:"assigned_by_user_id,omitempty"`
 	Status           string     `json:"status"`
 	Priority         string     `json:"priority"`
-	DueDate          *time.Time  `json:"due_date,omitempty"`
-	StartedAt        *time.Time  `json:"started_at,omitempty"`
-	CompletedAt      *time.Time  `json:"completed_at,omitempty"`
+	DueDate          *time.Time `json:"due_date,omitempty"`
+	StartedAt        *time.Time `json:"started_at,omitempty"`
+	CompletedAt      *time.Time `json:"completed_at,omitempty"`
 	Notes            string     `json:"notes,omitempty"`
 	InternalNotes    string     `json:"internal_notes,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`

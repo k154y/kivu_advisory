@@ -123,7 +123,7 @@ func (h *Handler) GetClientByID(w http.ResponseWriter, r *http.Request) {
 
 	clientID := r.URL.Query().Get("id")
 	if clientID == "" {
-		response.BadRequest(w, "client id is required",nil)
+		response.BadRequest(w, "client id is required", nil)
 		return
 	}
 

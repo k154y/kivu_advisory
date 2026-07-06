@@ -183,9 +183,9 @@ func (s *R2Storage) Open(ctx context.Context, key string) (*OpenedFile, error) {
 	}
 
 	return &OpenedFile{
-		Reader:   output.Body,
-		FileName: fileName,
-		MimeType: mimeType,
+		Reader:    output.Body,
+		FileName:  fileName,
+		MimeType:  mimeType,
 		SizeBytes: sizeBytes,
 	}, nil
 }

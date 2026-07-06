@@ -30,21 +30,21 @@ type Handler struct {
 }
 
 type CreateServiceRequestRequest struct {
-	ClientID                string `json:"client_id"`
-	ServiceID               string `json:"service_id"`
-	RequesterName           string `json:"requester_name"`
-	RequesterEmail          string `json:"requester_email"`
-	RequesterPhone          string `json:"requester_phone"`
-	RequesterCompany        string `json:"requester_company"`
-	Title                   string `json:"title"`
-	Description             string `json:"description"`
-	Priority                string `json:"priority"`
-	PreferredContactMethod  string `json:"preferred_contact_method"`
-	ExpectedDeadline        string `json:"expected_deadline"`
+	ClientID               string `json:"client_id"`
+	ServiceID              string `json:"service_id"`
+	RequesterName          string `json:"requester_name"`
+	RequesterEmail         string `json:"requester_email"`
+	RequesterPhone         string `json:"requester_phone"`
+	RequesterCompany       string `json:"requester_company"`
+	Title                  string `json:"title"`
+	Description            string `json:"description"`
+	Priority               string `json:"priority"`
+	PreferredContactMethod string `json:"preferred_contact_method"`
+	ExpectedDeadline       string `json:"expected_deadline"`
 }
 
 type UpdateServiceRequestRequest struct {
-	ServiceID               string `json:"service_id"`
+	ServiceID              string `json:"service_id"`
 	RequesterName          string `json:"requester_name"`
 	RequesterEmail         string `json:"requester_email"`
 	RequesterPhone         string `json:"requester_phone"`

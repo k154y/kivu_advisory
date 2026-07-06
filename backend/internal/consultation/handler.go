@@ -60,8 +60,8 @@ type consultationStatusRequest struct {
 	Status           string `json:"status"`
 	AssignedToUserID string `json:"assigned_to_user_id"`
 	HandledByUserID  string `json:"handled_by_user_id"`
-	AdminNotes        string `json:"admin_notes"`
-	FollowUpNotes     string `json:"follow_up_notes"`
+	AdminNotes       string `json:"admin_notes"`
+	FollowUpNotes    string `json:"follow_up_notes"`
 }
 
 func (h *Handler) PublicConsultations(w http.ResponseWriter, r *http.Request) {

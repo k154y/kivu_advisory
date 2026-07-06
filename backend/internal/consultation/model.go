@@ -9,12 +9,12 @@ import (
 
 const (
 	TypeGeneral          = "general"
-	TypeAccounting      = "accounting"
-	TypeTax             = "tax"
-	TypeAudit           = "audit"
+	TypeAccounting       = "accounting"
+	TypeTax              = "tax"
+	TypeAudit            = "audit"
 	TypeBusinessAdvisory = "business_advisory"
-	TypeLegal           = "legal"
-	TypeOther           = "other"
+	TypeLegal            = "legal"
+	TypeOther            = "other"
 
 	StatusNew        = "new"
 	StatusContacted  = "contacted"
@@ -69,7 +69,7 @@ type PublicConsultation struct {
 	Message                string     `json:"message"`
 	ConsultationType       string     `json:"consultation_type"`
 	PreferredContactMethod string     `json:"preferred_contact_method"`
-	PreferredDate          *time.Time  `json:"preferred_date,omitempty"`
+	PreferredDate          *time.Time `json:"preferred_date,omitempty"`
 	PreferredTime          string     `json:"preferred_time,omitempty"`
 	Status                 string     `json:"status"`
 	Priority               string     `json:"priority"`
@@ -77,8 +77,8 @@ type PublicConsultation struct {
 	HandledByUserID        string     `json:"handled_by_user_id,omitempty"`
 	AdminNotes             string     `json:"admin_notes,omitempty"`
 	FollowUpNotes          string     `json:"follow_up_notes,omitempty"`
-	ContactedAt            *time.Time  `json:"contacted_at,omitempty"`
-	ClosedAt               *time.Time  `json:"closed_at,omitempty"`
+	ContactedAt            *time.Time `json:"contacted_at,omitempty"`
+	ClosedAt               *time.Time `json:"closed_at,omitempty"`
 	CreatedAt              time.Time  `json:"created_at"`
 	UpdatedAt              time.Time  `json:"updated_at"`
 }
@@ -121,8 +121,8 @@ type UpdateStatusInput struct {
 	Status           string
 	AssignedToUserID string
 	HandledByUserID  string
-	AdminNotes        string
-	FollowUpNotes     string
+	AdminNotes       string
+	FollowUpNotes    string
 }
 
 type ListConsultationsFilter struct {

@@ -133,9 +133,9 @@ func (s *LocalStorage) Open(ctx context.Context, key string) (*OpenedFile, error
 	}
 
 	return &OpenedFile{
-		Reader:   file,
-		FileName: fileName,
-		MimeType: mimeType,
+		Reader:    file,
+		FileName:  fileName,
+		MimeType:  mimeType,
 		SizeBytes: fileInfo.Size(),
 	}, nil
 }

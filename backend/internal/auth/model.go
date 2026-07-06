@@ -19,14 +19,14 @@ type LoginRequest struct {
 }
 
 type RegisterClientRequest struct {
-	FullName     string `json:"full_name"`
-	CompanyName  string `json:"company_name"`
-	Email        string `json:"email"`
-	Phone        string `json:"phone"`
-	WhatsApp     string `json:"whatsapp"`
-	Location     string `json:"location"`
-	Password     string `json:"password"`
-	AcceptTerms  bool   `json:"accept_terms"`
+	FullName    string `json:"full_name"`
+	CompanyName string `json:"company_name"`
+	Email       string `json:"email"`
+	Phone       string `json:"phone"`
+	WhatsApp    string `json:"whatsapp"`
+	Location    string `json:"location"`
+	Password    string `json:"password"`
+	AcceptTerms bool   `json:"accept_terms"`
 }
 
 type CreateAccountantRequest struct {

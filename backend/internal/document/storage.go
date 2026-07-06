@@ -60,9 +60,9 @@ type SavedFile struct {
 }
 
 type OpenedFile struct {
-	Reader   io.ReadCloser
-	FileName string
-	MimeType string
+	Reader    io.ReadCloser
+	FileName  string
+	MimeType  string
 	SizeBytes int64
 }
 

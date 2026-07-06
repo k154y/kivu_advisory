@@ -84,17 +84,17 @@ type StorageConfig struct {
 
 type R2Config struct {
 	AccountID       string
-	AccessKeyID    string
+	AccessKeyID     string
 	SecretAccessKey string
 	BucketName      string
 	Endpoint        string
 	Region          string
-	PublicBaseURL    string
+	PublicBaseURL   string
 }
 
 type UploadConfig struct {
-	MaxSizeMB          int
-	MaxSizeBytes       int64
+	MaxSizeMB         int
+	MaxSizeBytes      int64
 	AllowedExtensions []string
 	AllowedMimeTypes  []string
 }
@@ -111,9 +111,9 @@ type EmailConfig struct {
 
 type NotificationConfig struct {
 	SendEmailNotifications      bool
-	NotifyAdminOnNewRequest    bool
+	NotifyAdminOnNewRequest     bool
 	NotifyAdminOnDocumentUpload bool
-	NotifyClientOnStatusChange bool
+	NotifyClientOnStatusChange  bool
 }
 
 type AdminConfig struct {
@@ -172,16 +172,16 @@ func Load() (*Config, error) {
 			LocalUploadDir: getEnv("LOCAL_UPLOAD_DIR", "tmp/uploads-for-local-development"),
 			R2: R2Config{
 				AccountID:       getEnv("R2_ACCOUNT_ID", ""),
-				AccessKeyID:    getEnv("R2_ACCESS_KEY_ID", ""),
+				AccessKeyID:     getEnv("R2_ACCESS_KEY_ID", ""),
 				SecretAccessKey: getEnv("R2_SECRET_ACCESS_KEY", ""),
 				BucketName:      getEnv("R2_BUCKET_NAME", ""),
 				Endpoint:        getEnv("R2_ENDPOINT", ""),
 				Region:          getEnv("R2_REGION", "auto"),
-				PublicBaseURL:    getEnv("R2_PUBLIC_BASE_URL", ""),
+				PublicBaseURL:   getEnv("R2_PUBLIC_BASE_URL", ""),
 			},
 		},
 		Upload: UploadConfig{
-			MaxSizeMB:          getIntEnv("MAX_UPLOAD_SIZE_MB", 20),
+			MaxSizeMB:         getIntEnv("MAX_UPLOAD_SIZE_MB", 20),
 			AllowedExtensions: getCSVEnv("ALLOWED_UPLOAD_EXTENSIONS", "pdf,doc,docx,xls,xlsx,png,jpg,jpeg"),
 			AllowedMimeTypes:  getCSVEnv("ALLOWED_UPLOAD_MIME_TYPES", ""),
 		},
@@ -195,7 +195,7 @@ func Load() (*Config, error) {
 			UseTLS:    getBoolEnv("SMTP_USE_TLS", true),
 		},
 		Notifications: NotificationConfig{
-			SendEmailNotifications:       getBoolEnv("SEND_EMAIL_NOTIFICATIONS", false),
+			SendEmailNotifications:      getBoolEnv("SEND_EMAIL_NOTIFICATIONS", false),
 			NotifyAdminOnNewRequest:     getBoolEnv("NOTIFY_ADMIN_ON_NEW_REQUEST", true),
 			NotifyAdminOnDocumentUpload: getBoolEnv("NOTIFY_ADMIN_ON_DOCUMENT_UPLOAD", true),
 			NotifyClientOnStatusChange:  getBoolEnv("NOTIFY_CLIENT_ON_STATUS_CHANGE", true),
