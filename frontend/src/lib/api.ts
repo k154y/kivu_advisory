@@ -27,7 +27,7 @@ type DownloadResult = {
   contentType: string;
 };
 
-type RequestBody = BodyInit | Record<string, unknown> | unknown[] | null;
+type RequestBody = BodyInit | null;
 
 const isBrowser = () => typeof window !== "undefined";
 

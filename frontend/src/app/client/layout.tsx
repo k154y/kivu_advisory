@@ -1,7 +1,11 @@
-export default function ClientLayout({
-  children
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return <>{children}</>;
+import type { ReactNode } from "react";
+
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
+
+type ClientLayoutProps = {
+  children: ReactNode;
+};
+
+export default function ClientLayout({ children }: ClientLayoutProps) {
+  return <DashboardLayout>{children}</DashboardLayout>;
 }

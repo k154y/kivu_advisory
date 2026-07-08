@@ -35,21 +35,30 @@ export const endpoints = {
       withQuery("/client/service-requests/detail", { id }),
   },
 
-  public: {
-    services: "/services",
-    serviceDetailBySlug: (slug: string) =>
-      withQuery("/services/detail", { slug }),
+public: {
+  services: "/services",
+  serviceDetailBySlug: (slug: string) =>
+    withQuery("/services/detail", { slug }),
 
-    visitorServiceRequests: "/service-requests",
+  visitorServiceRequests: "/service-requests",
 
-    consultations: "/consultations",
+  consultations: "/consultations",
 
-    content: "/content",
-    contentDetail: (slug: string) => withQuery("/content/detail", { slug }),
+  content: "/content",
+  contentDetail: (slug: string) => withQuery("/content/detail", { slug }),
 
-    blog: "/blog",
-    blogDetail: (slug: string) => withQuery("/blog/detail", { slug }),
-  },
+  blog: "/blog",
+  blogDetail: (slug: string) => withQuery("/blog/detail", { slug }),
+
+  staff: (params?: {
+    search?: string;
+    homepage?: boolean;
+    page?: number;
+    page_size?: number;
+  }) => withQuery("/staff", params),
+
+  staffDetail: (slug: string) => withQuery("/staff/detail", { slug }),
+},
 
   admin: {
     clients: (params?: { search?: string; page?: number; page_size?: number }) =>
@@ -129,7 +138,22 @@ export const endpoints = {
     blog: "/admin/blog",
     blogDetail: (id: string) => withQuery("/admin/blog/detail", { id }),
     blogStatus: (id: string) => withQuery("/admin/blog/status", { id }),
-  },
+
+    staff: (params?: {
+      search?: string;
+      show_on_website?: boolean;
+      show_on_homepage?: boolean;
+      is_active?: boolean;
+      page?: number;
+      page_size?: number;
+    }) => withQuery("/admin/staff", params),
+
+    staffCreate: "/admin/staff",
+
+    staffDetail: (id: string) => withQuery("/admin/staff/detail", { id }),
+
+    staffStatus: (id: string) => withQuery("/admin/staff/status", { id }),
+    },
 
   accountant: {
     profile: "/accountant/profile",

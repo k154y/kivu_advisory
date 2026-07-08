@@ -1,7 +1,11 @@
-export default function AdminLayout({
-  children
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
-  return <>{children}</>;
+import type { ReactNode } from "react";
+
+import { DashboardLayout } from "@/components/layout/dashboard-layout";
+
+type AdminLayoutProps = {
+  children: ReactNode;
+};
+
+export default function AdminLayout({ children }: AdminLayoutProps) {
+  return <DashboardLayout>{children}</DashboardLayout>;
 }

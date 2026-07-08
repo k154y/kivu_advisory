@@ -9,6 +9,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/kyves/kivu-advisory/backend/internal/accountant"
+	"github.com/kyves/kivu-advisory/backend/internal/notification"
+	"github.com/kyves/kivu-advisory/backend/internal/staff"
 
 	"github.com/kyves/kivu-advisory/backend/internal/assignment"
 	"github.com/kyves/kivu-advisory/backend/internal/auth"
@@ -87,17 +89,33 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	consultationRepository := consultation.NewPostgresRepository(options.DatabasePool)
 	consultationService := consultation.NewService(consultationRepository)
 
+	staffRepository := staff.NewPostgresRepository(options.DatabasePool)
+	staffService := staff.NewService(staffRepository)
+
 	messageRepository := message.NewPostgresRepository(options.DatabasePool)
 	messageService := message.NewService(messageRepository, documentAccessChecker)
 
 	contentRepository := content.NewPostgresRepository(options.DatabasePool)
 	contentService := content.NewService(contentRepository)
 
-	blogRepository := blog.NewPostgresRepository(options.DatabasePool)
-	blogService := blog.NewService(blogRepository)
-
 	accountantRepository := accountant.NewPostgresRepository(options.DatabasePool)
 	accountantService := accountant.NewService(accountantRepository)
+
+	notificationRepository := notification.NewPostgresRepository(options.DatabasePool)
+	notificationDeliveryRepository := notification.NewPostgresDeliveryRepository(options.DatabasePool)
+	notificationRecipientRepository := notification.NewPostgresRecipientRepository(options.DatabasePool)
+
+	notificationService := notification.NewServiceWithDeliveryAndRecipients(
+		notificationRepository,
+		notificationDeliveryRepository,
+		notificationRecipientRepository,
+		notification.NewNoopEmailSender(),
+		notification.NewNoopSMSSender(),
+	)
+
+	blogRepository := blog.NewPostgresRepository(options.DatabasePool)
+	blogService := blog.NewServiceWithNotifications(blogRepository, notificationService)
+
 
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -125,6 +143,8 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	contentHandler := content.NewHandler(contentService)
 	blogHandler := blog.NewHandler(blogService)
 	accountantHandler := accountant.NewHandler(accountantService)
+	notificationHandler := notification.NewHandler(notificationService)
+	staffHandler := staff.NewHandler(staffService)
 
 	auth.RegisterRoutes(
 		mux,
@@ -201,6 +221,20 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		options.Config.Server.APIBasePath,
 		accountantHandler,
 		tokenManager,
+	)
+
+	notification.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		notificationHandler,
+		tokenManager,
+	)
+
+	staff.RegisterRoutes(
+	mux,
+	options.Config.Server.APIBasePath,
+	staffHandler,
+	tokenManager,
 	)
 
 	return tokenManager
@@ -280,6 +314,20 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/admin/accountant-accounts/detail", notImplemented("admin accountant account detail route requires database connection"))
 		mux.HandleFunc(api+"/admin/accountant-accounts/status", notImplemented("admin accountant account status route requires database connection"))
 		mux.HandleFunc(api+"/accountant/profile", notImplemented("accountant profile route requires database connection"))
+
+		mux.HandleFunc(api+"/notifications", notImplemented("notifications route requires database connection"))
+		mux.HandleFunc(api+"/notifications/unread-count", notImplemented("notification unread count route requires database connection"))
+		mux.HandleFunc(api+"/notifications/read", notImplemented("notification read route requires database connection"))
+		mux.HandleFunc(api+"/notifications/read-all", notImplemented("notification read all route requires database connection"))
+		mux.HandleFunc(api+"/notifications/detail", notImplemented("notification detail route requires database connection"))
+
+		mux.HandleFunc(api+"/staff", notImplemented("staff route requires database connection"))
+		mux.HandleFunc(api+"/staff/detail", notImplemented("staff detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/staff", notImplemented("admin staff route requires database connection"))
+		mux.HandleFunc(api+"/admin/staff/detail", notImplemented("admin staff detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/staff/status", notImplemented("admin staff status route requires database connection"))
+
+
 	}
 
 	mux.HandleFunc(api+"/admin", notImplemented("admin route is not implemented yet"))

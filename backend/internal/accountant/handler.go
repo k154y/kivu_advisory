@@ -1,6 +1,4 @@
 package accountant
-package accountant
-
 import (
 	"encoding/json"
 	"errors"
