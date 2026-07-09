@@ -1,111 +1,251 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
   ArrowRight,
-  BarChart2,
-  BookOpen,
   CheckCircle,
+  Clock,
   FileText,
-  Shield,
-  TrendingUp,
   Users,
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/layout/public-layout";
 
-const services = [
-  {
-    slug: "accounting-bookkeeping",
-    icon: BookOpen,
-    title: "Accounting & Bookkeeping",
-    category: "Accounting",
-    desc: "Accurate records, organized financials, reconciliations, and clear reporting for better business decisions.",
-    includes: [
-      "Bookkeeping support",
-      "Account reconciliation",
-      "Monthly reporting assistance",
-      "Financial record organization",
-      "Document classification",
-      "Management reporting support",
+type ServiceDetail = {
+  title: string;
+  desc: string;
+  icon: string;
+  whatIncluded: string[];
+  whoNeeds: string[];
+  requiredDocs: string[];
+  deliveryTime: string;
+  benefits: string[];
+};
+
+const SERVICES: Record<string, ServiceDetail> = {
+  "accounting-bookkeeping": {
+    title: "Accounting and Bookkeeping",
+    desc:
+      "We help businesses record, organize, and maintain accurate financial transactions. Our bookkeeping service ensures your accounts are always up to date, your records are organized, and your financial reports are ready when you need them.",
+    icon: "📒",
+    whatIncluded: [
+      "Daily transaction recording",
+      "Bank and cash reconciliation",
+      "Accounts payable and receivable",
+      "Monthly financial summaries",
+      "Chart of accounts setup",
+      "General ledger maintenance",
+    ],
+    whoNeeds: [
+      "Small and medium enterprises",
+      "NGOs and projects",
+      "Schools and institutions",
+      "Startups needing a proper system",
+      "Companies without in-house accountant",
+    ],
+    requiredDocs: [
+      "Business registration certificate",
+      "Bank statements",
+      "Sales invoices and receipts",
+      "Purchase invoices",
+      "Previous accounting records if any",
+    ],
+    deliveryTime: "Monthly ongoing service or one-time cleanup (2–5 business days)",
+    benefits: [
+      "Accurate financial records always available",
+      "Easier tax declaration and compliance",
+      "Better decision-making with real numbers",
+      "Avoid RRA penalties for poor records",
+      "Audit-ready financial documentation",
     ],
   },
-  {
-    slug: "tax-declaration-advisory",
-    icon: FileText,
-    title: "Tax Declaration & Advisory",
-    category: "Tax",
-    desc: "RRA compliance, tax declarations, VAT, PAYE, and practical tax advisory to avoid penalties.",
-    includes: [
-      "Tax declaration preparation",
-      "VAT support",
-      "PAYE support",
-      "RRA compliance guidance",
-      "Tax document review",
-      "Tax advisory consultation",
+
+  "tax-declaration-advisory": {
+    title: "Tax Declaration and Advisory",
+    desc:
+      "We support clients with all aspects of tax compliance in Rwanda. From VAT to PAYE to corporate income tax, we prepare, review, and submit your declarations accurately and on time.",
+    icon: "📋",
+    whatIncluded: [
+      "VAT declaration preparation and submission",
+      "PAYE declaration and filing",
+      "Corporate income tax declaration",
+      "Turnover tax for eligible businesses",
+      "Withholding tax computation",
+      "RRA advisory and correspondence",
+    ],
+    whoNeeds: [
+      "Registered VAT taxpayers",
+      "Businesses with employees",
+      "Companies filing annual income tax",
+      "Individuals with business income",
+      "NGOs with taxable activities",
+    ],
+    requiredDocs: [
+      "RRA TIN certificate",
+      "Monthly sales and purchase records",
+      "Payroll data for PAYE",
+      "Bank statements",
+      "Invoices and receipts",
+    ],
+    deliveryTime: "Monthly declarations submitted before RRA deadlines",
+    benefits: [
+      "Zero late filing penalties",
+      "Accurate tax computation",
+      "Full RRA compliance",
+      "Tax planning and cost optimization",
+      "Professional handling of RRA communications",
     ],
   },
-  {
-    slug: "payroll-management",
-    icon: Users,
+
+  "payroll-management": {
     title: "Payroll Management",
-    category: "Payroll",
-    desc: "Salaries, RSSB, PAYE, payslips, and payroll records managed accurately and confidentially.",
-    includes: [
-      "Salary calculation",
-      "PAYE calculation",
-      "RSSB support",
-      "Payslip preparation",
-      "Payroll record management",
-      "Payroll reporting support",
+    desc:
+      "We manage your entire payroll process including salary computation, PAYE deductions, RSSB contributions, and payslip generation. Your employees are paid correctly and your obligations are met on time.",
+    icon: "💼",
+    whatIncluded: [
+      "Monthly salary computation",
+      "PAYE calculation and filing",
+      "RSSB employee and employer contributions",
+      "Professional payslip generation",
+      "Payroll register maintenance",
+      "Staff payroll records",
+    ],
+    whoNeeds: [
+      "Businesses with full-time or part-time employees",
+      "NGOs with local staff",
+      "Schools and institutions with teaching staff",
+      "Companies growing their team",
+    ],
+    requiredDocs: [
+      "Staff list with salary details",
+      "Employment contracts",
+      "RRA TIN for employees",
+      "RSSB numbers",
+      "Previous payroll data if available",
+    ],
+    deliveryTime: "Monthly payroll delivered 2–3 days before payment date",
+    benefits: [
+      "Accurate salary and deductions",
+      "On-time RSSB and PAYE filings",
+      "No payroll calculation errors",
+      "Confidential staff salary records",
+      "Professional payslips for every employee",
     ],
   },
-  {
-    slug: "financial-statements",
-    icon: BarChart2,
+
+  "financial-statements": {
     title: "Financial Statements",
-    category: "Reporting",
-    desc: "Balance sheets, income statements, cash flow reports, and management reports prepared professionally.",
-    includes: [
+    desc:
+      "We prepare professional financial statements that help businesses understand their financial position, meet reporting obligations, and make better management decisions.",
+    icon: "📊",
+    whatIncluded: [
       "Income statement preparation",
       "Balance sheet preparation",
-      "Cash flow reporting",
-      "Financial analysis support",
-      "Management reporting",
-      "Year-end file support",
+      "Cash flow statement preparation",
+      "Notes to financial statements",
+      "Management reports",
+      "Year-end financial file review",
+    ],
+    whoNeeds: [
+      "Companies preparing annual reports",
+      "Businesses applying for loans",
+      "Organizations preparing for audit",
+      "Owners who need clear financial performance",
+      "Institutions with reporting obligations",
+    ],
+    requiredDocs: [
+      "Accounting records",
+      "Bank statements",
+      "Sales and purchase records",
+      "Payroll records",
+      "Asset and liability details",
+      "Previous financial statements if available",
+    ],
+    deliveryTime: "Usually 3–7 business days depending on document readiness",
+    benefits: [
+      "Clear view of business performance",
+      "Professional reports for banks or partners",
+      "Better management decisions",
+      "Audit-ready reporting",
+      "Improved financial transparency",
     ],
   },
-  {
-    slug: "internal-audit",
-    icon: Shield,
+
+  "internal-audit": {
     title: "Internal Audit",
-    category: "Audit",
-    desc: "Risk identification, internal controls review, compliance checks, and governance support.",
-    includes: [
+    desc:
+      "We help organizations review internal controls, identify risks, improve documentation, and strengthen financial governance before problems become serious.",
+    icon: "🛡️",
+    whatIncluded: [
       "Internal control review",
-      "Audit file preparation",
+      "Cash and bank control review",
+      "Procurement and payment process review",
       "Risk identification",
       "Compliance review",
-      "Process improvement advice",
-      "Documentation support",
+      "Audit recommendations report",
+    ],
+    whoNeeds: [
+      "NGOs and projects",
+      "Schools and institutions",
+      "Businesses with growing operations",
+      "Organizations preparing for external audit",
+      "Companies concerned about fraud or weak controls",
+    ],
+    requiredDocs: [
+      "Accounting records",
+      "Policies and procedures",
+      "Bank statements",
+      "Payment vouchers",
+      "Procurement files",
+      "Previous audit reports if available",
+    ],
+    deliveryTime: "Usually 5–15 business days depending on scope",
+    benefits: [
+      "Stronger internal controls",
+      "Reduced fraud and error risk",
+      "Better compliance and documentation",
+      "Improved accountability",
+      "Clear recommendations for management",
     ],
   },
-  {
-    slug: "business-advisory",
-    icon: TrendingUp,
+
+  "business-advisory": {
     title: "Business Advisory",
-    category: "Advisory",
-    desc: "Practical advisory to help companies improve performance, reduce costs, and grow sustainably.",
-    includes: [
-      "Business planning",
-      "Budgeting support",
-      "Financial decision support",
-      "Cost control guidance",
-      "Performance analysis",
-      "Growth advisory",
+    desc:
+      "We provide practical advisory support to help businesses improve performance, control costs, prepare plans, and make informed financial decisions.",
+    icon: "📈",
+    whatIncluded: [
+      "Business planning support",
+      "Budget preparation",
+      "Cash flow analysis",
+      "Cost control advisory",
+      "Financial performance review",
+      "Growth and investment guidance",
+    ],
+    whoNeeds: [
+      "Startups and entrepreneurs",
+      "Growing small and medium businesses",
+      "Companies preparing business plans",
+      "Businesses seeking financing",
+      "Owners needing financial decision support",
+    ],
+    requiredDocs: [
+      "Business registration documents",
+      "Sales and expense records",
+      "Bank statements",
+      "Existing business plan if any",
+      "Loan or investment information if applicable",
+      "Management information available",
+    ],
+    deliveryTime: "Depends on assignment scope, usually 3–10 business days",
+    benefits: [
+      "Better business decisions",
+      "Clearer financial planning",
+      "Improved cost control",
+      "Stronger loan or investor preparation",
+      "Practical growth recommendations",
     ],
   },
-];
+};
 
 type ServiceDetailPageProps = {
   params: Promise<{ slug: string }> | { slug: string };
@@ -115,102 +255,184 @@ export default async function ServiceDetailPage({
   params,
 }: ServiceDetailPageProps) {
   const resolvedParams = await params;
-  const service = services.find((item) => item.slug === resolvedParams.slug);
+  const slug = resolvedParams.slug;
+  const service = SERVICES[slug];
 
   if (!service) {
     notFound();
   }
 
-  const Icon = service.icon;
-
   return (
     <PublicLayout>
-      <section className="bg-navy py-20 text-white">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/services"
-            className="mb-8 inline-flex items-center gap-2 text-sm font-semibold text-white/75 transition-colors hover:text-white"
-          >
-            <ArrowLeft size={16} />
-            Back to services
-          </Link>
-
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px] lg:items-center">
-            <div>
-              <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-gold">
-                {service.category}
-              </p>
-
-              <h1 className="max-w-4xl text-4xl font-bold leading-tight sm:text-5xl">
-                {service.title}
-              </h1>
-
-              <p className="mt-6 max-w-3xl leading-relaxed text-white/75">
-                {service.desc}
-              </p>
-
-              <div className="mt-8 flex flex-col gap-4 sm:flex-row">
-                <Link
-                  href={`/request-service?service=${service.slug}`}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-6 py-3.5 text-sm font-bold text-navy transition-colors hover:bg-gold-600"
-                >
-                  Request This Service
-                  <ArrowRight size={18} />
-                </Link>
-
-                <Link
-                  href="/book-consultation"
-                  className="inline-flex items-center justify-center gap-2 rounded-lg border-2 border-white/30 px-6 py-3.5 text-sm font-semibold text-white transition-all hover:border-white/60 hover:bg-white/5"
-                >
-                  Book Consultation
-                </Link>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-white/10 bg-white/10 p-8">
-              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal">
-                <Icon size={30} className="text-white" />
-              </div>
-
-              <h2 className="mb-3 text-xl font-bold">Professional Support</h2>
-
-              <p className="text-sm leading-relaxed text-white/70">
-                Submit your request and our team will review your needs, request
-                supporting documents, and guide you through the service process.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="bg-lightgray py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mb-10 max-w-2xl">
-            <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-teal">
-              What This Service Includes
+      <>
+        {/* Hero */}
+        <section className="bg-navy py-16 text-white">
+          <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
+            <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-teal">
+              <Link
+                href="/services"
+                className="transition-colors hover:text-white"
+              >
+                Services
+              </Link>
+              {" / "}
+              {service.title}
             </p>
 
-            <h2 className="text-3xl font-bold text-navy sm:text-4xl">
-              Clear support from request to delivery.
-            </h2>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {service.includes.map((item) => (
-              <div
-                key={item}
-                className="flex gap-3 rounded-xl border border-gray-100 bg-softwhite p-5"
-              >
-                <CheckCircle size={20} className="mt-0.5 shrink-0 text-teal" />
-
-                <p className="text-sm font-medium leading-relaxed text-gray-700">
-                  {item}
-                </p>
+            <div className="mb-5 flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-3xl">
+                {service.icon}
               </div>
-            ))}
+
+              <h1 className="text-4xl font-bold sm:text-5xl">
+                {service.title}
+              </h1>
+            </div>
+
+            <p className="max-w-2xl text-lg leading-relaxed text-gray-400">
+              {service.desc}
+            </p>
+
+            <div className="mt-8 flex flex-col gap-4 sm:flex-row">
+              <Link
+                href={`/request-service?service=${slug}`}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gold px-6 py-3 text-sm font-bold text-navy transition-colors hover:bg-gold-600"
+              >
+                Request This Service <ArrowRight size={16} />
+              </Link>
+
+              <Link
+                href="/book-consultation"
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/30 px-6 py-3 text-sm font-semibold text-white transition-all hover:border-white/60 hover:bg-white/5"
+              >
+                Book Consultation
+              </Link>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+
+        {/* Details */}
+        <section className="bg-white py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid gap-8 lg:grid-cols-3">
+              {/* Main content */}
+              <div className="space-y-10 lg:col-span-2">
+                <div>
+                  <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-navy">
+                    <CheckCircle size={20} className="text-teal" />
+                    What Is Included
+                  </h2>
+
+                  <ul className="space-y-2">
+                    {service.whatIncluded.map((item) => (
+                      <li key={item} className="flex items-start gap-3">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                        <span className="text-gray-700">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-navy">
+                    <Users size={20} className="text-teal" />
+                    Who Needs This Service
+                  </h2>
+
+                  <ul className="space-y-2">
+                    {service.whoNeeds.map((item) => (
+                      <li key={item} className="flex items-start gap-3">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-teal" />
+                        <span className="text-gray-700">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div>
+                  <h2 className="mb-4 flex items-center gap-2 text-xl font-bold text-navy">
+                    <CheckCircle size={20} className="text-teal" />
+                    Key Benefits
+                  </h2>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {service.benefits.map((benefit) => (
+                      <div
+                        key={benefit}
+                        className="flex items-start gap-2 rounded-lg bg-teal-50 p-3"
+                      >
+                        <CheckCircle
+                          size={15}
+                          className="mt-0.5 shrink-0 text-teal"
+                        />
+                        <span className="text-sm text-charcoal">
+                          {benefit}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Sidebar */}
+              <div className="space-y-5">
+                <div className="rounded-xl border border-gray-100 bg-lightgray p-6">
+                  <h3 className="mb-4 flex items-center gap-2 font-bold text-navy">
+                    <FileText size={16} className="text-teal" />
+                    Required Documents
+                  </h3>
+
+                  <ul className="space-y-2">
+                    {service.requiredDocs.map((document) => (
+                      <li
+                        key={document}
+                        className="flex items-start gap-2 text-sm text-gray-700"
+                      >
+                        <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-gray-400" />
+                        {document}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-lightgray p-6">
+                  <h3 className="mb-3 flex items-center gap-2 font-bold text-navy">
+                    <Clock size={16} className="text-teal" />
+                    Delivery Time
+                  </h3>
+
+                  <p className="text-sm text-gray-700">
+                    {service.deliveryTime}
+                  </p>
+                </div>
+
+                <div className="rounded-xl bg-navy p-6 text-white">
+                  <h3 className="mb-3 font-bold">Ready to Get Started?</h3>
+
+                  <p className="mb-4 text-sm text-gray-400">
+                    Submit your service request and we will contact you within
+                    24 hours.
+                  </p>
+
+                  <Link
+                    href={`/request-service?service=${slug}`}
+                    className="block w-full rounded-lg bg-gold py-3 text-center text-sm font-bold text-navy transition-colors hover:bg-gold-600"
+                  >
+                    Request This Service
+                  </Link>
+
+                  <Link
+                    href="/book-consultation"
+                    className="mt-2 block w-full rounded-lg border border-white/20 py-3 text-center text-sm font-semibold text-white transition-all hover:bg-white/5"
+                  >
+                    Book Consultation First
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </>
     </PublicLayout>
   );
 }

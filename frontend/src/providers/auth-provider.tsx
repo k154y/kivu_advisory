@@ -17,7 +17,6 @@ import {
   getRequiredRoleByPath,
   getStoredAuthUser,
   normalizeRole,
-  publicAuthPages,
 } from "@/lib/auth";
 import { endpoints } from "@/lib/endpoints";
 import type { AuthenticatedUser, UserRole } from "@/types/api";
@@ -54,8 +53,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const logout = useCallback(() => {
     clearAuthSession();
     setUserState(null);
-    router.replace("/login");
-  }, [router]);
+
+    if (!pathname.startsWith("/login")) {
+      router.replace("/login");
+    }
+  }, [pathname, router]);
 
   const refreshUser = useCallback(async () => {
     try {
@@ -71,19 +73,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   useEffect(() => {
-    const storedUser = getStoredAuthUser();
+    let cancelled = false;
 
-    if (storedUser) {
-      setUserState(storedUser);
+    const loadSession = async () => {
+      const storedUser = getStoredAuthUser();
 
-      void refreshUser().finally(() => {
-        setIsLoading(false);
-      });
+      if (!storedUser) {
+        if (!cancelled) {
+          setUserState(null);
+          setIsLoading(false);
+        }
 
-      return;
-    }
+        return;
+      }
 
-    setIsLoading(false);
+      if (!cancelled) {
+        setUserState(storedUser);
+      }
+
+      try {
+        await refreshUser();
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [refreshUser]);
 
   useEffect(() => {
@@ -91,22 +112,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const requiredRole = getRequiredRoleByPath(pathname);
 
-    if (requiredRole && !user) {
-      router.replace(`/login?next=${encodeURIComponent(pathname)}`);
+    if (!requiredRole) {
       return;
     }
 
-    if (requiredRole && user) {
-      const userRole = normalizeRole(user.role);
+    if (!user) {
+      const loginPath = `/login?next=${encodeURIComponent(pathname)}`;
 
-      if (userRole !== requiredRole) {
-        router.replace(getDashboardPathByRole(user.role));
-        return;
+      if (pathname !== "/login") {
+        router.replace(loginPath);
       }
+
+      return;
     }
 
-    if (user && publicAuthPages.some((authPage) => pathname.startsWith(authPage))) {
-      router.replace(getDashboardPathByRole(user.role));
+    const userRole = normalizeRole(user.role);
+
+    if (userRole !== requiredRole) {
+      const correctDashboardPath = getDashboardPathByRole(user.role);
+
+      if (pathname !== correctDashboardPath) {
+        router.replace(correctDashboardPath);
+      }
     }
   }, [isLoading, pathname, router, user]);
 

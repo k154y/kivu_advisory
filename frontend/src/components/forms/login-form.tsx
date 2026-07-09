@@ -1,6 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -8,8 +9,6 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 import { FormError } from "@/components/forms/form-error";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   api,
   getApiErrorMessage,
@@ -18,7 +17,8 @@ import {
 } from "@/lib/api";
 import { getDashboardPathByRole } from "@/lib/auth";
 import { endpoints } from "@/lib/endpoints";
-import type { AuthenticatedUser, TokenResponse } from "@/types/api";
+import { useAuth } from "@/hooks/use-auth";
+import type { TokenResponse } from "@/types/api";
 
 const loginFormSchema = z.object({
   email: z.string().trim().email("Enter a valid email address."),
@@ -27,31 +27,14 @@ const loginFormSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginFormSchema>;
 
-type TokenStorageWriter = typeof tokenStorage & {
-  setAccessToken?: (token: string) => void;
-  setRefreshToken?: (token: string) => void;
-  setUser?: (user: AuthenticatedUser) => void;
-  setTokens?: (...args: unknown[]) => void;
-  setSession?: (...args: unknown[]) => void;
-};
-
-const saveLoginSession = (tokenResponse: TokenResponse) => {
-  const storage = tokenStorage as TokenStorageWriter;
-
-  storage.setTokens?.(tokenResponse);
-  storage.setSession?.(tokenResponse);
-
-  storage.setAccessToken?.(tokenResponse.access_token);
-  storage.setRefreshToken?.(tokenResponse.refresh_token);
-  storage.setUser?.(tokenResponse.user);
-};
-
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { setUser } = useAuth();
 
   const [serverError, setServerError] = useState<string | null>(null);
   const [serverErrorDetails, setServerErrorDetails] = useState<unknown>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   const {
     register,
@@ -70,12 +53,10 @@ export function LoginForm() {
     setServerErrorDetails(null);
 
     try {
-      const result = await api.post<TokenResponse>(
-        endpoints.auth.login,
-        values,
-      );
+      const result = await api.post<TokenResponse>(endpoints.auth.login, values);
 
-      saveLoginSession(result.data);
+      tokenStorage.setAuth(result.data);
+      setUser(result.data.user);
 
       const nextPath = searchParams.get("next");
       const fallbackPath = getDashboardPathByRole(result.data.user.role);
@@ -92,46 +73,87 @@ export function LoginForm() {
 
   return (
     <div className="space-y-6">
-      <FormError
-        message={serverError || undefined}
-        details={serverErrorDetails}
-      />
+      <FormError message={serverError || undefined} details={serverErrorDetails} />
 
-      <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
-        <Input
-          label="Email address"
-          type="email"
-          placeholder="you@example.com"
-          autoComplete="email"
-          required
-          error={errors.email?.message}
-          {...register("email")}
-        />
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-charcoal">
+            Email Address
+          </label>
 
-        <Input
-          label="Password"
-          type="password"
-          placeholder="Enter your password"
-          autoComplete="current-password"
-          required
-          error={errors.password?.message}
-          {...register("password")}
-        />
+          <input
+            type="email"
+            placeholder="your@email.com"
+            autoComplete="email"
+            className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm transition-colors focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
+            {...register("email")}
+          />
 
-        <Button type="submit" className="w-full" isLoading={isSubmitting}>
-          Sign in
-        </Button>
+          {errors.email?.message ? (
+            <p className="mt-1.5 text-xs font-medium text-red-600">
+              {errors.email.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-charcoal">
+            Password
+          </label>
+
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              placeholder="Your password"
+              autoComplete="current-password"
+              className="w-full rounded-lg border border-gray-200 px-4 py-3 pr-10 text-sm transition-colors focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
+              {...register("password")}
+            />
+
+            <button
+              type="button"
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+
+          {errors.password?.message ? (
+            <p className="mt-1.5 text-xs font-medium text-red-600">
+              {errors.password.message}
+            </p>
+          ) : null}
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-navy py-3.5 text-sm font-semibold text-white transition-colors hover:bg-navy-700 disabled:opacity-60"
+        >
+          {isSubmitting ? (
+            "Logging in..."
+          ) : (
+            <>
+              <span>Log In</span>
+              <ArrowRight size={16} />
+            </>
+          )}
+        </button>
       </form>
 
-      <div className="text-center text-sm text-slate-600">
-        Do not have a client account?{" "}
-        <Link
-          href="/register"
-          className="font-medium text-[#0F2742] underline-offset-4 hover:underline"
-        >
-          Create one here
-        </Link>
-      </div>
+      {/* <div className="border-t border-gray-100 pt-6 text-center">
+        <p className="text-sm text-gray-500">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/register"
+            className="font-semibold text-teal hover:underline"
+          >
+            Create Account
+          </Link>
+        </p>
+      </div> */}
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Toaster } from "sonner";
 
 import "@/styles/globals.css";
+import { AuthProvider } from "@/providers/auth-provider";
 
 export const metadata: Metadata = {
   title: {
@@ -19,7 +21,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
       <body className="min-h-screen bg-white text-slate-950 antialiased">
-        {children}
+        <AuthProvider>{children}</AuthProvider>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

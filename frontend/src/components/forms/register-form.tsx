@@ -200,11 +200,11 @@ export function RegisterForm() {
         ) : null}
 
         <Button type="submit" className="w-full" isLoading={isSubmitting}>
-          Create client account
+          Create account
         </Button>
       </form>
 
-      <div className="text-center text-sm text-slate-600">
+      {/* <div className="text-center text-sm text-slate-600">
         Already have an account?{" "}
         <Link
           href="/login"
@@ -212,7 +212,7 @@ export function RegisterForm() {
         >
           Sign in
         </Link>
-      </div>
+      </div> */}
     </div>
   );
 }
