@@ -3,6 +3,8 @@ export const routes = {
   about: "/about",
   services: "/services",
   serviceDetail: (slug: string) => `/services/${slug}`,
+  staff: "/staff",
+  staffDetail: (slug: string) => `/staff/${slug}`,
   blog: "/blog",
   blogDetail: (slug: string) => `/blog/${slug}`,
   contact: "/contact",
@@ -13,22 +15,32 @@ export const routes = {
 
   admin: {
     dashboard: "/admin/dashboard",
+
     accountants: "/admin/accountants",
     accountantCreate: "/admin/accountants/create",
     accountantDetail: (id: string) => `/admin/accountants/${id}`,
+
     clients: "/admin/clients",
     clientDetail: (id: string) => `/admin/clients/${id}`,
+
     services: "/admin/services",
     serviceCreate: "/admin/services/create",
     serviceDetail: (id: string) => `/admin/services/${id}`,
+
+    staff: "/admin/staff",
+
     requests: "/admin/requests",
     requestDetail: (id: string) => `/admin/requests/${id}`,
+
     consultations: "/admin/consultations",
+
     blog: "/admin/blog",
     blogCreate: "/admin/blog/create",
     blogDetail: (id: string) => `/admin/blog/${id}`,
+
     testimonials: "/admin/testimonials",
-    settings: "/admin/settings",
+
+    contentManager: "/admin/content",
     content: {
       homepage: "/admin/content/homepage",
       about: "/admin/content/about",
@@ -36,6 +48,8 @@ export const routes = {
       footer: "/admin/content/footer",
       socialMedia: "/admin/content/social-media",
     },
+
+    settings: "/admin/settings",
   },
 
   client: {
@@ -59,6 +73,7 @@ export const publicNavigation = [
   { label: "Home", href: routes.home },
   { label: "About", href: routes.about },
   { label: "Services", href: routes.services },
+  { label: "Staff", href: routes.staff },
   { label: "Blog", href: routes.blog },
   { label: "Contact", href: routes.contact },
 ];
@@ -69,8 +84,10 @@ export const adminNavigation = [
   { label: "Clients", href: routes.admin.clients },
   { label: "Service Requests", href: routes.admin.requests },
   { label: "Services", href: routes.admin.services },
+  { label: "Staff", href: routes.admin.staff },
   { label: "Consultations", href: routes.admin.consultations },
   { label: "Blog", href: routes.admin.blog },
+  { label: "Website Content", href: routes.admin.contentManager },
   { label: "Testimonials", href: routes.admin.testimonials },
   { label: "Settings", href: routes.admin.settings },
 ];

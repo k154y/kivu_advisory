@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { useAuth } from "@/hooks/use-auth";
+import { getDashboardPathByRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const navLinks = [
@@ -18,8 +20,12 @@ const navLinks = [
 
 export function PublicNavbar() {
   const pathname = usePathname();
+  const { user, isLoading, logout } = useAuth();
+
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+
+  const dashboardHref = user ? getDashboardPathByRole(user.role) : "/login";
 
   useEffect(() => {
     const handleScroll = () => {
@@ -36,6 +42,11 @@ export function PublicNavbar() {
   useEffect(() => {
     setOpen(false);
   }, [pathname]);
+
+  const handleLogout = () => {
+    setOpen(false);
+    logout();
+  };
 
   return (
     <header
@@ -78,12 +89,33 @@ export function PublicNavbar() {
           </nav>
 
           <div className="hidden items-center gap-3 lg:flex">
-            <Link
-              href="/login"
-              className="text-sm font-medium text-gray-700 transition-colors hover:text-navy"
-            >
-              Log In
-            </Link>
+            {!isLoading && user ? (
+              <>
+                <Link
+                  href={dashboardHref}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 transition-colors hover:text-navy"
+                >
+                  <LayoutDashboard size={16} />
+                  Dashboard
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 transition-colors hover:text-red-600"
+                >
+                  <LogOut size={16} />
+                  Log Out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="text-sm font-medium text-gray-700 transition-colors hover:text-navy"
+              >
+                Log In
+              </Link>
+            )}
 
             <Link
               href="/request-service"
@@ -130,12 +162,33 @@ export function PublicNavbar() {
             })}
 
             <div className="space-y-2 border-t border-gray-100 pt-3">
-              <Link
-                href="/login"
-                className="block w-full rounded-lg border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Log In
-              </Link>
+              {!isLoading && user ? (
+                <>
+                  <Link
+                    href={dashboardHref}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <LayoutDashboard size={16} />
+                    Dashboard
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={handleLogout}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-100 px-4 py-2.5 text-center text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut size={16} />
+                    Log Out
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/login"
+                  className="block w-full rounded-lg border border-gray-200 px-4 py-2.5 text-center text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Log In
+                </Link>
+              )}
 
               <Link
                 href="/request-service"

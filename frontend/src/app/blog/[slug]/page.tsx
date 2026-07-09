@@ -1,101 +1,181 @@
+"use client";
+
 import Link from "next/link";
-import { notFound } from "next/navigation";
-import { ArrowLeft, Calendar } from "lucide-react";
+import { useParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Calendar, Tag } from "lucide-react";
 
 import { PublicLayout } from "@/components/layout/public-layout";
+import { api } from "@/lib/api";
+import type { BlogPost } from "@/types/api";
 
-const posts = [
+const fallbackPosts: BlogPost[] = [
   {
-    slug: "preparing-records-before-tax-declaration",
-    title: "Preparing Your Records Before Tax Declaration",
-    category: "Tax",
-    date: "Advisory Insight",
+    id: "fallback-blog-1",
+    title: "How Proper Bookkeeping Helps Your Business Grow",
+    slug: "proper-bookkeeping-business-growth",
     excerpt:
-      "Good preparation helps reduce errors, missing documents, and last-minute pressure during tax filing periods.",
-    body: [
-      "Tax declaration becomes easier when accounting records are organized before the filing period starts. Businesses should keep sales records, purchase invoices, payroll information, bank statements, tax receipts, and supporting documents in one clear system.",
-      "A common problem is waiting until the deadline before checking whether documents are complete. This can create pressure, mistakes, and unnecessary penalties. Regular bookkeeping and monthly review reduce this risk.",
-      "Kivu Advisory helps clients review records, identify missing documents, prepare declarations, and understand their tax obligations before deadlines become urgent.",
-    ],
-  },
-  {
-    slug: "why-businesses-need-organized-accounting-documents",
-    title: "Why Businesses Need Organized Accounting Documents",
+      "Good bookkeeping gives business owners clear financial information, better control, and stronger decision-making.",
+    body:
+      "Proper bookkeeping helps a business understand its income, expenses, debts, assets, and cash flow.\n\nIt also helps management prepare tax declarations, financial statements, and business decisions with confidence.\n\nWhen records are updated regularly, business owners can know what they owe, what clients owe them, and whether the business is making profit.",
     category: "Accounting",
-    date: "Client Guidance",
-    excerpt:
-      "Well-organized documents make reporting, review, audit preparation, and decision-making easier.",
-    body: [
-      "Accounting documents are the foundation of reliable financial reporting. Without organized documents, it becomes difficult to prepare accurate reports, justify tax declarations, review transactions, or respond to audit questions.",
-      "Businesses should organize documents by month, document type, supplier, customer, and payment method. This helps accountants review transactions faster and reduces the risk of missing information.",
-      "A structured document workflow also helps management understand income, expenses, cash flow, debts, and financial performance.",
-    ],
+    tags: ["accounting", "bookkeeping", "business"],
+    featured_image_url:
+      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80",
+    status: "published",
+    is_featured: true,
+    view_count: 0,
+    published_at: "",
+    created_at: "",
+    updated_at: "",
   },
   {
-    slug: "how-a-client-portal-improves-advisory-service",
-    title: "How a Client Portal Improves Advisory Service Delivery",
-    category: "Platform",
-    date: "Service Update",
+    id: "fallback-blog-2",
+    title: "Why Tax Compliance Matters for Rwandan Businesses",
+    slug: "tax-compliance-rwandan-businesses",
     excerpt:
-      "A secure portal helps clients submit requests, upload files, exchange messages, and track progress.",
-    body: [
-      "A client portal improves communication between the client and advisory team. Instead of using scattered emails and messages, requests, documents, and service updates can be organized in one place.",
-      "Clients can submit service requests, upload documents, receive questions from the team, and track progress. This helps reduce confusion and improves accountability.",
-      "For professional services such as accounting, tax, payroll, audit, and advisory, clear documentation and secure communication are important.",
-    ],
+      "Tax compliance protects businesses from penalties and builds trust with financial institutions and partners.",
+    body:
+      "A business that respects tax deadlines and keeps clear records can avoid unnecessary penalties.\n\nIt also becomes more credible when applying for loans, tenders, partnerships, or investment opportunities.\n\nGood tax compliance starts with proper bookkeeping, organized invoices, accurate declarations, and timely follow-up with tax obligations.",
+    category: "Tax",
+    tags: ["tax", "rra", "compliance"],
+    featured_image_url:
+      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=80",
+    status: "published",
+    is_featured: false,
+    view_count: 0,
+    published_at: "",
+    created_at: "",
+    updated_at: "",
   },
   {
-    slug: "payroll-compliance-for-growing-businesses",
-    title: "Payroll Compliance for Growing Businesses",
-    category: "Payroll",
-    date: "Compliance Note",
+    id: "fallback-blog-3",
+    title: "Preparing Your Business for an External Audit",
+    slug: "preparing-business-external-audit",
     excerpt:
-      "Payroll records, PAYE, RSSB, and staff documentation should be handled carefully as a business grows.",
-    body: [
-      "As a business grows, payroll becomes more sensitive. Salary calculations, PAYE, RSSB, staff advances, allowances, deductions, and payslips must be handled accurately.",
-      "A clear payroll process helps avoid staff disputes, reporting errors, and compliance problems. Payroll records should be reviewed monthly and kept securely.",
-      "Kivu Advisory supports businesses with payroll organization, reporting, and compliance follow-up.",
-    ],
-  },
-  {
-    slug: "internal-controls-small-businesses",
-    title: "Simple Internal Controls for Small Businesses",
+      "Organized documents, reconciliations, and internal controls make audit preparation easier and more professional.",
+    body:
+      "Audit preparation should not begin only when auditors arrive.\n\nBusinesses should organize invoices, bank statements, payroll files, tax declarations, contracts, and supporting documents throughout the year.\n\nA well-prepared audit file saves time, reduces stress, and improves the credibility of financial reports.",
     category: "Audit",
-    date: "Business Control",
-    excerpt:
-      "Strong internal controls help reduce errors, fraud risks, cash leakage, and poor financial reporting.",
-    body: [
-      "Internal controls are not only for large companies. Small businesses also need clear controls over cash, purchases, sales, stock, approvals, and reporting.",
-      "Simple controls include separating duties, documenting approvals, reconciling cash and bank accounts, reviewing expenses, and keeping proper supporting documents.",
-      "Better controls help business owners reduce risks and understand operations more clearly.",
-    ],
-  },
-  {
-    slug: "business-planning-financial-decisions",
-    title: "Business Planning and Financial Decisions",
-    category: "Advisory",
-    date: "Planning Guide",
-    excerpt:
-      "Good decisions are easier when owners understand costs, cash flow, margins, and financial risks.",
-    body: [
-      "Business planning is stronger when decisions are based on financial information. Owners should understand sales trends, direct costs, fixed costs, margins, cash flow, and debt obligations.",
-      "Financial reports are not only for tax purposes. They help management decide when to invest, reduce costs, hire staff, expand, or restructure operations.",
-      "Kivu Advisory helps clients use financial information practically for better planning and decision-making.",
-    ],
+    tags: ["audit", "compliance", "documents"],
+    featured_image_url:
+      "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1200&q=80",
+    status: "published",
+    is_featured: false,
+    view_count: 0,
+    published_at: "",
+    created_at: "",
+    updated_at: "",
   },
 ];
 
-type BlogDetailPageProps = {
-  params: Promise<{ slug: string }> | { slug: string };
-};
+function formatDate(value?: string | null) {
+  if (!value) return "Kivu Advisory";
 
-export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
-  const resolvedParams = await params;
-  const post = posts.find((item) => item.slug === resolvedParams.slug);
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Kivu Advisory";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function getParagraphs(body: string) {
+  return body
+    .split(/\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+}
+
+export default function BlogDetailPage() {
+  const params = useParams<{ slug: string }>();
+  const slug = params.slug;
+
+  const fallbackPost = useMemo(
+    () => fallbackPosts.find((post) => post.slug === slug) || null,
+    [slug],
+  );
+
+  const [post, setPost] = useState<BlogPost | null>(fallbackPost);
+  const [isLoading, setIsLoading] = useState(!fallbackPost);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPost = async () => {
+      setIsLoading(true);
+
+      try {
+        const result = await api.get<BlogPost>(
+          `/blog/detail?slug=${encodeURIComponent(slug)}`,
+        );
+
+        if (!cancelled) {
+          setPost(result.data);
+        }
+      } catch {
+        if (!cancelled) {
+          setPost(fallbackPost);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    if (slug) {
+      void loadPost();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackPost, slug]);
+
+  if (isLoading) {
+    return (
+      <PublicLayout>
+        <section className="flex min-h-[70vh] items-center justify-center bg-lightgray">
+          <p className="text-sm font-medium text-gray-600">
+            Loading article...
+          </p>
+        </section>
+      </PublicLayout>
+    );
+  }
 
   if (!post) {
-    notFound();
+    return (
+      <PublicLayout>
+        <section className="flex min-h-[70vh] items-center justify-center bg-lightgray px-4">
+          <div className="max-w-md text-center">
+            <h1 className="mb-3 text-2xl font-bold text-navy">
+              Article not found
+            </h1>
+
+            <p className="mb-6 text-gray-600">
+              The article you are looking for is not available.
+            </p>
+
+            <Link
+              href="/blog"
+              className="inline-flex rounded-lg bg-navy px-5 py-3 text-sm font-semibold text-white hover:bg-navy-700"
+            >
+              Back to blog
+            </Link>
+          </div>
+        </section>
+      </PublicLayout>
+    );
   }
+
+  const paragraphs = getParagraphs(post.body || "");
 
   return (
     <PublicLayout>
@@ -109,61 +189,87 @@ export default async function BlogDetailPage({ params }: BlogDetailPageProps) {
             Back to blog
           </Link>
 
-          <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-gold">
-            {post.category}
-          </p>
+          {post.category ? (
+            <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-gold">
+              {post.category}
+            </p>
+          ) : null}
 
           <h1 className="text-4xl font-bold leading-tight sm:text-5xl">
             {post.title}
           </h1>
 
-          <div className="mt-5 flex items-center gap-2 text-sm text-white/70">
-            <Calendar size={15} />
-            {post.date}
+          <div className="mt-6 flex flex-wrap items-center gap-4 text-sm text-white/70">
+            <span className="inline-flex items-center gap-2">
+              <Calendar size={16} />
+              {formatDate(post.published_at || post.created_at)}
+            </span>
+
+            {post.tags?.length ? (
+              <span className="inline-flex items-center gap-2">
+                <Tag size={16} />
+                {post.tags.slice(0, 3).join(", ")}
+              </span>
+            ) : null}
           </div>
 
-          <p className="mt-6 leading-relaxed text-white/75">{post.excerpt}</p>
+          {post.excerpt ? (
+            <p className="mt-6 text-lg leading-relaxed text-white/75">
+              {post.excerpt}
+            </p>
+          ) : null}
         </div>
       </section>
 
-      <section className="bg-softwhite py-20">
-        <article className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-gray-100 bg-lightgray p-6 sm:p-8">
-            <div className="space-y-6">
-              {post.body.map((paragraph) => (
-                <p key={paragraph} className="leading-8 text-gray-700">
-                  {paragraph}
-                </p>
-              ))}
-            </div>
-
-            <div className="mt-10 rounded-xl bg-navy p-6 text-white">
-              <h2 className="mb-3 text-xl font-bold">
-                Need professional support?
-              </h2>
-
-              <p className="mb-5 text-sm leading-relaxed text-white/75">
-                Submit a service request or book a consultation to discuss your
-                accounting, tax, payroll, audit, or advisory needs.
-              </p>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/request-service"
-                  className="inline-flex items-center justify-center rounded-lg bg-gold px-5 py-3 text-sm font-bold text-navy transition-colors hover:bg-gold-600"
-                >
-                  Request a Service
-                </Link>
-
-                <Link
-                  href="/book-consultation"
-                  className="inline-flex items-center justify-center rounded-lg border border-white/30 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/5"
-                >
-                  Book Consultation
-                </Link>
-              </div>
+      {post.featured_image_url ? (
+        <section className="bg-lightgray pt-12">
+          <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
+            <div className="overflow-hidden rounded-2xl shadow-lg">
+              <img
+                src={post.featured_image_url}
+                alt={post.title}
+                className="max-h-[520px] w-full object-cover"
+              />
             </div>
           </div>
+        </section>
+      ) : null}
+
+      <section className="bg-lightgray py-16">
+        <article className="mx-auto max-w-3xl rounded-2xl border border-gray-100 bg-softwhite p-6 shadow-sm sm:p-10">
+          <div className="space-y-6">
+            {paragraphs.length > 0 ? (
+              paragraphs.map((paragraph, index) => (
+                <p
+                  key={`${paragraph.slice(0, 20)}-${index}`}
+                  className="text-base leading-8 text-gray-700"
+                >
+                  {paragraph}
+                </p>
+              ))
+            ) : (
+              <p className="text-base leading-8 text-gray-700">
+                This article content will be available soon.
+              </p>
+            )}
+          </div>
+
+          {post.tags?.length ? (
+            <div className="mt-10 border-t border-gray-100 pt-6">
+              <p className="mb-3 text-sm font-semibold text-navy">Tags</p>
+
+              <div className="flex flex-wrap gap-2">
+                {post.tags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </article>
       </section>
     </PublicLayout>

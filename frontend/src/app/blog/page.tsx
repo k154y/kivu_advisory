@@ -1,115 +1,202 @@
+"use client";
+
 import Link from "next/link";
-import { Calendar, ChevronRight } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowRight, Calendar } from "lucide-react";
 
 import { PublicLayout } from "@/components/layout/public-layout";
+import { api } from "@/lib/api";
+import type { BlogPost } from "@/types/api";
 
-const posts = [
+type BlogListResponse = {
+  items: BlogPost[];
+};
+
+const fallbackPosts: BlogPost[] = [
   {
-    slug: "preparing-records-before-tax-declaration",
-    title: "Preparing Your Records Before Tax Declaration",
-    category: "Tax",
-    date: "Advisory Insight",
+    id: "fallback-blog-1",
+    title: "How Proper Bookkeeping Helps Your Business Grow",
+    slug: "proper-bookkeeping-business-growth",
     excerpt:
-      "Good preparation helps reduce errors, missing documents, and last-minute pressure during tax filing periods.",
-  },
-  {
-    slug: "why-businesses-need-organized-accounting-documents",
-    title: "Why Businesses Need Organized Accounting Documents",
+      "Good bookkeeping gives business owners clear financial information, better control, and stronger decision-making.",
+    body:
+      "Proper bookkeeping helps a business understand its income, expenses, debts, assets, and cash flow. It also helps management prepare tax declarations, financial statements, and business decisions with confidence.",
     category: "Accounting",
-    date: "Client Guidance",
-    excerpt:
-      "Well-organized documents make reporting, review, audit preparation, and decision-making easier.",
+    tags: ["accounting", "bookkeeping", "business"],
+    featured_image_url:
+      "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1200&q=80",
+    status: "published",
+    is_featured: true,
+    view_count: 0,
+    published_at: "",
+    created_at: "",
+    updated_at: "",
   },
   {
-    slug: "how-a-client-portal-improves-advisory-service",
-    title: "How a Client Portal Improves Advisory Service Delivery",
-    category: "Platform",
-    date: "Service Update",
+    id: "fallback-blog-2",
+    title: "Why Tax Compliance Matters for Rwandan Businesses",
+    slug: "tax-compliance-rwandan-businesses",
     excerpt:
-      "A secure portal helps clients submit requests, upload files, exchange messages, and track progress.",
+      "Tax compliance protects businesses from penalties and builds trust with financial institutions and partners.",
+    body:
+      "A business that respects tax deadlines and keeps clear records can avoid unnecessary penalties. It also becomes more credible when applying for loans, tenders, partnerships, or investment opportunities.",
+    category: "Tax",
+    tags: ["tax", "rra", "compliance"],
+    featured_image_url:
+      "https://images.unsplash.com/photo-1554224155-6726b3ff858f?auto=format&fit=crop&w=1200&q=80",
+    status: "published",
+    is_featured: false,
+    view_count: 0,
+    published_at: "",
+    created_at: "",
+    updated_at: "",
   },
   {
-    slug: "payroll-compliance-for-growing-businesses",
-    title: "Payroll Compliance for Growing Businesses",
-    category: "Payroll",
-    date: "Compliance Note",
+    id: "fallback-blog-3",
+    title: "Preparing Your Business for an External Audit",
+    slug: "preparing-business-external-audit",
     excerpt:
-      "Payroll records, PAYE, RSSB, and staff documentation should be handled carefully as a business grows.",
-  },
-  {
-    slug: "internal-controls-small-businesses",
-    title: "Simple Internal Controls for Small Businesses",
+      "Organized documents, reconciliations, and internal controls make audit preparation easier and more professional.",
+    body:
+      "Audit preparation should not begin only when auditors arrive. Businesses should organize invoices, bank statements, payroll files, tax declarations, contracts, and supporting documents throughout the year.",
     category: "Audit",
-    date: "Business Control",
-    excerpt:
-      "Strong internal controls help reduce errors, fraud risks, cash leakage, and poor financial reporting.",
-  },
-  {
-    slug: "business-planning-financial-decisions",
-    title: "Business Planning and Financial Decisions",
-    category: "Advisory",
-    date: "Planning Guide",
-    excerpt:
-      "Good decisions are easier when owners understand costs, cash flow, margins, and financial risks.",
+    tags: ["audit", "compliance", "documents"],
+    featured_image_url:
+      "https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1200&q=80",
+    status: "published",
+    is_featured: false,
+    view_count: 0,
+    published_at: "",
+    created_at: "",
+    updated_at: "",
   },
 ];
 
+function getBlogItems(data: BlogListResponse | BlogPost[]) {
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return data.items || [];
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return "Kivu Advisory";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "Kivu Advisory";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
 export default function BlogPage() {
+  const [posts, setPosts] = useState<BlogPost[]>(fallbackPosts);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPosts = async () => {
+      try {
+        const result = await api.get<BlogListResponse | BlogPost[]>(
+          "/blog?page_size=50",
+        );
+
+        const items = getBlogItems(result.data).filter(Boolean);
+
+        if (!cancelled && items.length > 0) {
+          setPosts(items);
+        }
+      } catch {
+        if (!cancelled) {
+          setPosts(fallbackPosts);
+        }
+      }
+    };
+
+    void loadPosts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <PublicLayout>
       <section className="bg-navy py-20 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="mb-3 text-sm font-semibold uppercase tracking-wider text-gold">
-            Blog & Insights
+            Blog
           </p>
 
           <h1 className="max-w-4xl text-4xl font-bold leading-tight sm:text-5xl">
-            Practical accounting, tax, payroll, audit, and advisory updates.
+            Accounting, Tax, Audit and Business Insights
           </h1>
 
-          <p className="mt-6 max-w-3xl leading-relaxed text-white/75">
-            Read useful guidance prepared for businesses, institutions,
-            entrepreneurs, and organizations that want better financial
-            management and compliance.
+          <p className="mt-6 max-w-2xl leading-relaxed text-white/75">
+            Read practical articles prepared to help businesses stay compliant,
+            organized, and financially informed.
           </p>
         </div>
       </section>
 
       <section className="bg-lightgray py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
-              <article
-                key={post.slug}
-                className="rounded-xl border border-gray-100 bg-softwhite p-6 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              <Link
+                key={post.id || post.slug}
+                href={`/blog/${post.slug}`}
+                className="group overflow-hidden rounded-xl border border-gray-100 bg-softwhite shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
               >
-                <div className="mb-4 flex items-center justify-between gap-3">
-                  <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal">
-                    {post.category}
-                  </span>
-
-                  <span className="inline-flex items-center gap-1 text-xs text-gray-500">
-                    <Calendar size={13} />
-                    {post.date}
-                  </span>
+                <div className="aspect-[16/10] overflow-hidden bg-gray-100">
+                  {post.featured_image_url ? (
+                    <img
+                      src={post.featured_image_url}
+                      alt={post.title}
+                      className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-navy-50 text-sm font-semibold text-navy/50">
+                      Kivu Advisory
+                    </div>
+                  )}
                 </div>
 
-                <h2 className="mb-3 text-lg font-bold leading-snug text-navy">
-                  {post.title}
-                </h2>
+                <div className="p-6">
+                  <div className="mb-3 flex items-center gap-2 text-xs text-gray-500">
+                    <Calendar size={14} />
+                    <span>{formatDate(post.published_at || post.created_at)}</span>
+                  </div>
 
-                <p className="mb-5 text-sm leading-relaxed text-gray-600">
-                  {post.excerpt}
-                </p>
+                  {post.category ? (
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-teal">
+                      {post.category}
+                    </p>
+                  ) : null}
 
-                <Link
-                  href={`/blog/${post.slug}`}
-                  className="inline-flex items-center gap-1 text-sm font-semibold text-teal transition-all hover:gap-2"
-                >
-                  Read More
-                  <ChevronRight size={14} />
-                </Link>
-              </article>
+                  <h2 className="mb-3 line-clamp-2 text-lg font-bold text-navy">
+                    {post.title}
+                  </h2>
+
+                  {post.excerpt ? (
+                    <p className="mb-5 line-clamp-3 text-sm leading-relaxed text-gray-600">
+                      {post.excerpt}
+                    </p>
+                  ) : null}
+
+                  <span className="inline-flex items-center gap-1 text-sm font-semibold text-teal transition-all group-hover:gap-2">
+                    Read Article
+                    <ArrowRight size={14} />
+                  </span>
+                </div>
+              </Link>
             ))}
           </div>
         </div>
