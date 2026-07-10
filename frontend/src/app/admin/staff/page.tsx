@@ -1,23 +1,23 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Edit3,
   Eye,
   EyeOff,
-  Globe2,
-  Home,
+  Pencil,
   Plus,
-  RefreshCcw,
-  Save,
+  Star,
+  ToggleLeft,
+  ToggleRight,
   Trash2,
   UserRound,
+  X,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 
-type AdminStaffMember = {
+type StaffMember = {
   id: string;
   full_name: string;
   slug: string;
@@ -39,15 +39,15 @@ type AdminStaffMember = {
   show_contact: boolean;
   display_order: number;
   is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 };
 
 type StaffListResponse = {
-  items: AdminStaffMember[];
+  items: StaffMember[];
 };
 
-type StaffFormState = {
+type StaffForm = {
   full_name: string;
   slug: string;
   role_title: string;
@@ -75,7 +75,7 @@ type ApiWithDelete = typeof api & {
   delete?: <T>(path: string) => Promise<T>;
 };
 
-const emptyForm: StaffFormState = {
+const EMPTY: StaffForm = {
   full_name: "",
   slug: "",
   role_title: "",
@@ -88,17 +88,17 @@ const emptyForm: StaffFormState = {
   phone: "",
   photo_url: "",
   show_on_website: true,
-  show_on_homepage: true,
+  show_on_homepage: false,
   show_bio: true,
   show_education: true,
   show_work_experience: true,
   show_certifications: true,
-  show_contact: true,
-  display_order: 1,
+  show_contact: false,
+  display_order: 0,
   is_active: true,
 };
 
-function getStaffItems(data: StaffListResponse | AdminStaffMember[]) {
+function getStaffItems(data: StaffListResponse | StaffMember[]) {
   if (Array.isArray(data)) {
     return data;
   }
@@ -106,7 +106,16 @@ function getStaffItems(data: StaffListResponse | AdminStaffMember[]) {
   return data.items || [];
 }
 
-function staffToForm(staff: AdminStaffMember): StaffFormState {
+function createSlug(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function toForm(staff: StaffMember): StaffForm {
   return {
     full_name: staff.full_name || "",
     slug: staff.slug || "",
@@ -119,19 +128,19 @@ function staffToForm(staff: AdminStaffMember): StaffFormState {
     email: staff.email || "",
     phone: staff.phone || "",
     photo_url: staff.photo_url || "",
-    show_on_website: staff.show_on_website,
-    show_on_homepage: staff.show_on_homepage,
-    show_bio: staff.show_bio,
-    show_education: staff.show_education,
-    show_work_experience: staff.show_work_experience,
-    show_certifications: staff.show_certifications,
-    show_contact: staff.show_contact,
-    display_order: staff.display_order || 1,
-    is_active: staff.is_active,
+    show_on_website: Boolean(staff.show_on_website),
+    show_on_homepage: Boolean(staff.show_on_homepage),
+    show_bio: Boolean(staff.show_bio),
+    show_education: Boolean(staff.show_education),
+    show_work_experience: Boolean(staff.show_work_experience),
+    show_certifications: Boolean(staff.show_certifications),
+    show_contact: Boolean(staff.show_contact),
+    display_order: staff.display_order || 0,
+    is_active: Boolean(staff.is_active),
   };
 }
 
-function buildPayload(form: StaffFormState) {
+function buildPayload(form: StaffForm) {
   return {
     full_name: form.full_name.trim(),
     slug: form.slug.trim(),
@@ -151,21 +160,12 @@ function buildPayload(form: StaffFormState) {
     show_work_experience: form.show_work_experience,
     show_certifications: form.show_certifications,
     show_contact: form.show_contact,
-    display_order: Number(form.display_order) || 1,
+    display_order: Number(form.display_order) || 0,
     is_active: form.is_active,
   };
 }
 
-function createSlug(value: string) {
-  return value
-    .trim()
-    .toLowerCase()
-    .replace(/&/g, "and")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-async function deleteStaffRequest(path: string) {
+async function deleteStaff(path: string) {
   const apiClient = api as ApiWithDelete;
 
   if (apiClient.del) {
@@ -180,94 +180,75 @@ async function deleteStaffRequest(path: string) {
 }
 
 export default function AdminStaffPage() {
-  const [staffMembers, setStaffMembers] = useState<AdminStaffMember[]>([]);
-  const [selectedStaff, setSelectedStaff] = useState<AdminStaffMember | null>(
-    null,
-  );
-  const [form, setForm] = useState<StaffFormState>(emptyForm);
-  const [search, setSearch] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const filteredStaff = useMemo(() => {
-    const searchValue = search.trim().toLowerCase();
+  const [modal, setModal] = useState<{
+    open: boolean;
+    editing?: StaffMember | null;
+  }>({ open: false });
 
-    return [...staffMembers]
-      .sort((a, b) => {
-        if (a.display_order !== b.display_order) {
-          return a.display_order - b.display_order;
-        }
+  const [form, setForm] = useState<StaffForm>(EMPTY);
 
-        return a.full_name.localeCompare(b.full_name);
-      })
-      .filter((staff) => {
-        if (!searchValue) return true;
-
-        return (
-          staff.full_name.toLowerCase().includes(searchValue) ||
-          staff.slug.toLowerCase().includes(searchValue) ||
-          staff.role_title.toLowerCase().includes(searchValue) ||
-          (staff.email || "").toLowerCase().includes(searchValue)
-        );
-      });
-  }, [search, staffMembers]);
-
-  const loadStaff = async () => {
-    setIsLoading(true);
+  const load = async () => {
+    setLoading(true);
 
     try {
-      const result = await api.get<StaffListResponse | AdminStaffMember[]>(
+      const result = await api.get<StaffListResponse | StaffMember[]>(
         "/admin/staff?page_size=100",
       );
 
-      setStaffMembers(getStaffItems(result.data));
+      const items = getStaffItems(result.data).sort(
+        (a, b) => (a.display_order || 0) - (b.display_order || 0),
+      );
+
+      setStaff(items);
     } catch {
       toast.error("Failed to load staff members.");
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadStaff();
+    void load();
   }, []);
 
-  const updateForm = <K extends keyof StaffFormState>(
-    field: K,
-    value: StaffFormState[K],
+  const openCreate = () => {
+    setForm(EMPTY);
+    setModal({ open: true, editing: null });
+  };
+
+  const openEdit = (staffMember: StaffMember) => {
+    setForm(toForm(staffMember));
+    setModal({ open: true, editing: staffMember });
+  };
+
+  const closeModal = () => {
+    setModal({ open: false });
+    setForm(EMPTY);
+  };
+
+  const updateForm = <K extends keyof StaffForm>(
+    key: K,
+    value: StaffForm[K],
   ) => {
     setForm((current) => ({
       ...current,
-      [field]: value,
+      [key]: value,
     }));
   };
 
-  const startCreate = () => {
-    setSelectedStaff(null);
-    setForm(emptyForm);
-  };
-
-  const startEdit = (staff: AdminStaffMember) => {
-    setSelectedStaff(staff);
-    setForm(staffToForm(staff));
-  };
-
-  const handleFullNameChange = (value: string) => {
+  const handleNameChange = (value: string) => {
     setForm((current) => ({
       ...current,
       full_name: value,
-      slug:
-        current.slug && selectedStaff
-          ? current.slug
-          : current.slug
-            ? current.slug
-            : createSlug(value),
+      slug: current.slug ? current.slug : createSlug(value),
     }));
   };
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
+  const handleSave = async () => {
     if (!form.full_name.trim()) {
       toast.error("Full name is required.");
       return;
@@ -283,14 +264,14 @@ export default function AdminStaffPage() {
       return;
     }
 
-    setIsSaving(true);
+    setSaving(true);
 
     try {
       const payload = buildPayload(form);
 
-      if (selectedStaff) {
+      if (modal.editing) {
         await api.put(
-          `/admin/staff/detail?id=${encodeURIComponent(selectedStaff.id)}`,
+          `/admin/staff/detail?id=${encodeURIComponent(modal.editing.id)}`,
           payload,
         );
 
@@ -300,379 +281,345 @@ export default function AdminStaffPage() {
         toast.success("Staff member created.");
       }
 
-      setSelectedStaff(null);
-      setForm(emptyForm);
-      await loadStaff();
+      await load();
+      closeModal();
     } catch {
-      toast.error(
-        selectedStaff
-          ? "Failed to update staff member."
-          : "Failed to create staff member.",
-      );
+      toast.error("Failed to save staff member.");
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
-  const handleToggleStatus = async (
-    staff: AdminStaffMember,
-    field: "is_active" | "show_on_website" | "show_on_homepage",
-  ) => {
-    try {
-      await api.patch(
-        `/admin/staff/status?id=${encodeURIComponent(staff.id)}`,
-        {
-          is_active:
-            field === "is_active" ? !staff.is_active : staff.is_active,
-          show_on_website:
-            field === "show_on_website"
-              ? !staff.show_on_website
-              : staff.show_on_website,
-          show_on_homepage:
-            field === "show_on_homepage"
-              ? !staff.show_on_homepage
-              : staff.show_on_homepage,
-        },
-      );
-
-      toast.success("Staff visibility updated.");
-      await loadStaff();
-    } catch {
-      toast.error("Failed to update staff visibility.");
-    }
-  };
-
-  const handleDelete = async (staff: AdminStaffMember) => {
-    const confirmed = window.confirm(
-      `Delete ${staff.full_name}? This action cannot be undone.`,
-    );
-
-    if (!confirmed) return;
+  const handleDelete = async (staffMember: StaffMember) => {
+    if (!window.confirm(`Delete ${staffMember.full_name}?`)) return;
 
     try {
-      await deleteStaffRequest(
-        `/admin/staff/detail?id=${encodeURIComponent(staff.id)}`,
+      await deleteStaff(
+        `/admin/staff/detail?id=${encodeURIComponent(staffMember.id)}`,
       );
 
       toast.success("Staff member deleted.");
-
-      if (selectedStaff?.id === staff.id) {
-        setSelectedStaff(null);
-        setForm(emptyForm);
-      }
-
-      await loadStaff();
+      await load();
     } catch {
       toast.error("Failed to delete staff member.");
     }
   };
 
+  const handleToggleActive = async (staffMember: StaffMember) => {
+    try {
+      await api.patch(
+        `/admin/staff/status?id=${encodeURIComponent(staffMember.id)}`,
+        {
+          is_active: !staffMember.is_active,
+          show_on_website: staffMember.show_on_website,
+          show_on_homepage: staffMember.show_on_homepage,
+        },
+      );
+
+      toast.success(
+        staffMember.is_active
+          ? "Staff member deactivated."
+          : "Staff member activated.",
+      );
+
+      await load();
+    } catch {
+      toast.error("Failed to update staff status.");
+    }
+  };
+
+  const handleToggleWebsite = async (staffMember: StaffMember) => {
+    try {
+      await api.patch(
+        `/admin/staff/status?id=${encodeURIComponent(staffMember.id)}`,
+        {
+          is_active: staffMember.is_active,
+          show_on_website: !staffMember.show_on_website,
+          show_on_homepage: staffMember.show_on_homepage,
+        },
+      );
+
+      toast.success("Website visibility updated.");
+      await load();
+    } catch {
+      toast.error("Failed to update website visibility.");
+    }
+  };
+
+  const handleToggleHomepage = async (staffMember: StaffMember) => {
+    try {
+      await api.patch(
+        `/admin/staff/status?id=${encodeURIComponent(staffMember.id)}`,
+        {
+          is_active: staffMember.is_active,
+          show_on_website: staffMember.show_on_website,
+          show_on_homepage: !staffMember.show_on_homepage,
+        },
+      );
+
+      toast.success("Homepage visibility updated.");
+      await load();
+    } catch {
+      toast.error("Failed to update homepage visibility.");
+    }
+  };
+
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 rounded-2xl bg-navy p-6 text-white md:flex-row md:items-center md:justify-between">
+    <div className="max-w-6xl">
+      <div className="mb-6 flex items-center justify-between">
         <div>
-          <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-gold">
-            Website Staff
-          </p>
+          <h1 className="text-2xl font-bold text-navy">Staff</h1>
 
-          <h1 className="text-2xl font-bold">Manage Staff Members</h1>
-
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-            Add staff profiles for the public website, choose who appears on the
-            homepage, and control what profile sections visitors can see.
+          <p className="mt-1 text-sm text-gray-500">
+            {staff.length} team member{staff.length !== 1 ? "s" : ""}
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void loadStaff()}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            <RefreshCcw size={16} />
-            Refresh
-          </button>
-
-          <button
-            type="button"
-            onClick={startCreate}
-            className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-bold text-navy hover:bg-gold-600"
-          >
-            <Plus size={16} />
-            New Staff
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openCreate}
+          className="flex items-center gap-2 rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-navy-700"
+        >
+          <Plus size={16} />
+          Add Staff
+        </button>
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-[420px_minmax(0,1fr)]">
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-lg font-bold text-navy">
-              <UserRound size={18} />
-              Staff List
-            </h2>
-
-            <span className="rounded-full bg-navy-50 px-3 py-1 text-xs font-bold text-navy">
-              {filteredStaff.length}
-            </span>
+      <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+        {loading ? (
+          <div className="p-8 text-center text-sm text-gray-400">
+            Loading...
           </div>
+        ) : staff.length === 0 ? (
+          <div className="p-8 text-center text-sm text-gray-400">
+            No staff members yet
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[920px] text-sm">
+              <thead className="border-b border-gray-100 bg-lightgray">
+                <tr>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Staff
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Slug
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Order
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Active
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Website
+                  </th>
+                  <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
+                    Homepage
+                  </th>
+                  <th className="px-5 py-3" />
+                </tr>
+              </thead>
 
-          <input
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search staff..."
-            className="mb-5 w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
-          />
-
-          {isLoading ? (
-            <p className="text-sm text-gray-500">Loading staff members...</p>
-          ) : filteredStaff.length > 0 ? (
-            <div className="space-y-3">
-              {filteredStaff.map((staff) => (
-                <div
-                  key={staff.id}
-                  className={`rounded-xl border p-4 transition-colors ${
-                    selectedStaff?.id === staff.id
-                      ? "border-teal bg-teal-50"
-                      : "border-gray-100 bg-white hover:border-navy/30"
-                  }`}
-                >
-                  <div className="flex gap-3">
-                    <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-navy-50">
-                      {staff.photo_url ? (
-                        <img
-                          src={staff.photo_url}
-                          alt={staff.full_name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-full w-full items-center justify-center">
-                          <UserRound size={24} className="text-navy/40" />
+              <tbody className="divide-y divide-gray-50">
+                {staff.map((staffMember) => (
+                  <tr key={staffMember.id} className="hover:bg-lightgray/50">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-11 w-11 overflow-hidden rounded-full bg-navy-50">
+                          {staffMember.photo_url ? (
+                            <img
+                              src={staffMember.photo_url}
+                              alt={staffMember.full_name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <UserRound size={20} className="text-navy" />
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-navy">
-                        {staff.full_name}
-                      </p>
+                        <div className="min-w-0">
+                          <p className="font-medium text-navy">
+                            {staffMember.full_name}
+                          </p>
 
-                      <p className="truncate text-sm text-gray-500">
-                        {staff.role_title}
-                      </p>
+                          <p className="text-xs text-gray-500">
+                            {staffMember.role_title}
+                          </p>
 
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        <StatusPill
-                          active={staff.is_active}
-                          label={staff.is_active ? "Active" : "Inactive"}
-                        />
-
-                        <StatusPill
-                          active={staff.show_on_website}
-                          label={
-                            staff.show_on_website
-                              ? "Website"
-                              : "Hidden website"
-                          }
-                        />
-
-                        <StatusPill
-                          active={staff.show_on_homepage}
-                          label={
-                            staff.show_on_homepage
-                              ? "Homepage"
-                              : "Not homepage"
-                          }
-                        />
+                          {staffMember.short_description ? (
+                            <p className="line-clamp-1 text-xs text-gray-400">
+                              {staffMember.short_description}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </td>
 
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(staff)}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      <Edit3 size={14} />
-                      Edit
-                    </button>
+                    <td className="px-5 py-4 font-mono text-xs text-gray-500">
+                      {staffMember.slug}
+                    </td>
 
-                    <button
-                      type="button"
-                      onClick={() => handleToggleStatus(staff, "is_active")}
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      {staff.is_active ? <EyeOff size={14} /> : <Eye size={14} />}
-                      {staff.is_active ? "Deactivate" : "Activate"}
-                    </button>
+                    <td className="px-5 py-4 text-gray-600">
+                      {staffMember.display_order}
+                    </td>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleToggleStatus(staff, "show_on_website")
-                      }
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      <Globe2 size={14} />
-                      Website
-                    </button>
+                    <td className="px-5 py-4">
+                      <ToggleButton
+                        active={staffMember.is_active}
+                        activeLabel="Active"
+                        inactiveLabel="Inactive"
+                        onClick={() => handleToggleActive(staffMember)}
+                      />
+                    </td>
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        handleToggleStatus(staff, "show_on_homepage")
-                      }
-                      className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
-                    >
-                      <Home size={14} />
-                      Homepage
-                    </button>
+                    <td className="px-5 py-4">
+                      <VisibilityButton
+                        visible={staffMember.show_on_website}
+                        label={staffMember.show_on_website ? "Shown" : "Hidden"}
+                        onClick={() => handleToggleWebsite(staffMember)}
+                      />
+                    </td>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(staff)}
-                      className="col-span-2 inline-flex items-center justify-center gap-2 rounded-lg border border-red-100 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
-                    >
-                      <Trash2 size={14} />
-                      Delete Staff
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-gray-200 p-6 text-center">
-              <UserRound className="mx-auto mb-3 text-gray-300" size={40} />
+                    <td className="px-5 py-4">
+                      {staffMember.show_on_homepage ? (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHomepage(staffMember)}
+                          className="inline-flex items-center gap-1 rounded-full bg-gold-50 px-2 py-1 text-xs font-bold text-gold-600"
+                        >
+                          <Star size={12} />
+                          Featured
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleToggleHomepage(staffMember)}
+                          className="text-xs text-gray-400 hover:text-navy"
+                        >
+                          No
+                        </button>
+                      )}
+                    </td>
 
-              <p className="font-semibold text-navy">No staff found</p>
+                    <td className="px-5 py-4">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openEdit(staffMember)}
+                          className="rounded p-1.5 text-gray-400 hover:text-navy"
+                        >
+                          <Pencil size={14} />
+                        </button>
 
-              <p className="mt-1 text-sm text-gray-500">
-                Create your first staff profile to show it on the public
-                website.
-              </p>
-            </div>
-          )}
-        </section>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(staffMember)}
+                          className="rounded p-1.5 text-gray-400 hover:text-red-500"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex items-center justify-between gap-4">
-            <div>
-              <h2 className="flex items-center gap-2 text-xl font-bold text-navy">
-                <Edit3 size={20} />
-                {selectedStaff ? "Edit Staff Member" : "Create Staff Member"}
+      {modal.open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white p-6">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <h2 className="text-lg font-bold text-navy">
+                {modal.editing ? "Edit Staff Member" : "Add Staff Member"}
               </h2>
 
-              <p className="mt-1 text-sm text-gray-500">
-                These details appear on the public staff page and staff profile
-                pages.
-              </p>
-            </div>
-
-            {selectedStaff ? (
               <button
                 type="button"
-                onClick={startCreate}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+                onClick={closeModal}
+                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-50 hover:text-navy"
               >
-                Cancel Edit
+                <X size={18} />
               </button>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-5 md:grid-cols-2">
-              <TextInput
-                label="Full Name"
-                value={form.full_name}
-                onChange={handleFullNameChange}
-                placeholder="John Doe"
-                required
-              />
-
-              <TextInput
-                label="Slug"
-                value={form.slug}
-                onChange={(value) => updateForm("slug", createSlug(value))}
-                placeholder="john-doe"
-                required
-              />
-
-              <TextInput
-                label="Role Title"
-                value={form.role_title}
-                onChange={(value) => updateForm("role_title", value)}
-                placeholder="Senior Accounting Advisor"
-                required
-              />
-
-              <TextInput
-                label="Display Order"
-                type="number"
-                value={String(form.display_order)}
-                onChange={(value) =>
-                  updateForm("display_order", Number(value) || 1)
-                }
-                placeholder="1"
-              />
-
-              <TextInput
-                label="Email"
-                type="email"
-                value={form.email}
-                onChange={(value) => updateForm("email", value)}
-                placeholder="staff@kivuadvisory.com"
-              />
-
-              <TextInput
-                label="Phone"
-                value={form.phone}
-                onChange={(value) => updateForm("phone", value)}
-                placeholder="0786196355"
-              />
             </div>
 
-            <TextInput
-              label="Photo URL"
-              value={form.photo_url}
-              onChange={(value) => updateForm("photo_url", value)}
-              placeholder="https://..."
-            />
+            <div className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2">
+                <TextInput
+                  label="Full Name *"
+                  value={form.full_name}
+                  onChange={handleNameChange}
+                />
 
-            <TextArea
-              label="Short Description"
-              value={form.short_description}
-              onChange={(value) => updateForm("short_description", value)}
-              placeholder="Short text shown on staff cards."
-              rows={3}
-            />
+                <TextInput
+                  label="Slug *"
+                  value={form.slug}
+                  onChange={(value) => updateForm("slug", createSlug(value))}
+                />
 
-            <TextArea
-              label="Bio"
-              value={form.bio}
-              onChange={(value) => updateForm("bio", value)}
-              placeholder="Professional biography."
-              rows={5}
-            />
+                <TextInput
+                  label="Role Title *"
+                  value={form.role_title}
+                  onChange={(value) => updateForm("role_title", value)}
+                />
 
-            <div className="grid gap-5 lg:grid-cols-3">
+                <TextInput
+                  label="Display Order"
+                  value={String(form.display_order)}
+                  onChange={(value) =>
+                    updateForm("display_order", Number(value) || 0)
+                  }
+                  type="number"
+                />
+
+                <TextInput
+                  label="Email"
+                  value={form.email}
+                  onChange={(value) => updateForm("email", value)}
+                />
+
+                <TextInput
+                  label="Phone"
+                  value={form.phone}
+                  onChange={(value) => updateForm("phone", value)}
+                />
+              </div>
+
+              <TextInput
+                label="Photo URL"
+                value={form.photo_url}
+                onChange={(value) => updateForm("photo_url", value)}
+              />
+
+              <TextArea
+                label="Short Description"
+                value={form.short_description}
+                onChange={(value) => updateForm("short_description", value)}
+              />
+
+              <TextArea
+                label="Bio"
+                value={form.bio}
+                onChange={(value) => updateForm("bio", value)}
+              />
+
               <TextArea
                 label="Education Background"
                 value={form.education_background}
                 onChange={(value) =>
                   updateForm("education_background", value)
                 }
-                placeholder="Degrees, training, education background."
-                rows={5}
               />
 
               <TextArea
                 label="Work Experience"
                 value={form.work_experience}
                 onChange={(value) => updateForm("work_experience", value)}
-                placeholder="Professional experience."
-                rows={5}
               />
 
               <TextArea
@@ -681,55 +628,47 @@ export default function AdminStaffPage() {
                 onChange={(value) =>
                   updateForm("professional_certifications", value)
                 }
-                placeholder="Certifications and professional training."
-                rows={5}
               />
-            </div>
 
-            <div className="rounded-xl border border-gray-100 bg-lightgray p-5">
-              <h3 className="mb-4 text-sm font-bold text-navy">
-                Website Visibility
-              </h3>
-
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 rounded-xl bg-lightgray p-4 md:grid-cols-2">
                 <CheckboxField
                   label="Active"
-                  description="Staff member is active in the system."
                   checked={form.is_active}
                   onChange={(value) => updateForm("is_active", value)}
                 />
 
                 <CheckboxField
-                  label="Show on Website"
-                  description="Visible on public staff pages."
+                  label="Show on website"
                   checked={form.show_on_website}
                   onChange={(value) => updateForm("show_on_website", value)}
                 />
 
                 <CheckboxField
-                  label="Show on Homepage"
-                  description="Visible in homepage staff section."
+                  label="Show on homepage"
                   checked={form.show_on_homepage}
                   onChange={(value) => updateForm("show_on_homepage", value)}
                 />
 
                 <CheckboxField
-                  label="Show Bio"
-                  description="Display bio on profile page."
+                  label="Show contact"
+                  checked={form.show_contact}
+                  onChange={(value) => updateForm("show_contact", value)}
+                />
+
+                <CheckboxField
+                  label="Show bio"
                   checked={form.show_bio}
                   onChange={(value) => updateForm("show_bio", value)}
                 />
 
                 <CheckboxField
-                  label="Show Education"
-                  description="Display education section."
+                  label="Show education"
                   checked={form.show_education}
                   onChange={(value) => updateForm("show_education", value)}
                 />
 
                 <CheckboxField
-                  label="Show Work Experience"
-                  description="Display experience section."
+                  label="Show work experience"
                   checked={form.show_work_experience}
                   onChange={(value) =>
                     updateForm("show_work_experience", value)
@@ -737,75 +676,36 @@ export default function AdminStaffPage() {
                 />
 
                 <CheckboxField
-                  label="Show Certifications"
-                  description="Display certifications section."
+                  label="Show certifications"
                   checked={form.show_certifications}
                   onChange={(value) =>
                     updateForm("show_certifications", value)
                   }
                 />
-
-                <CheckboxField
-                  label="Show Contact"
-                  description="Display email and phone."
-                  checked={form.show_contact}
-                  onChange={(value) => updateForm("show_contact", value)}
-                />
               </div>
             </div>
 
-            <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm">
-              <h3 className="mb-4 text-sm font-bold text-navy">
-                Public Preview
-              </h3>
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
 
-              <div className="flex gap-4">
-                <div className="h-20 w-20 shrink-0 overflow-hidden rounded-xl bg-navy-50">
-                  {form.photo_url ? (
-                    <img
-                      src={form.photo_url}
-                      alt={form.full_name || "Staff preview"}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <UserRound size={32} className="text-navy/40" />
-                    </div>
-                  )}
-                </div>
-
-                <div>
-                  <p className="text-lg font-bold text-navy">
-                    {form.full_name || "Staff full name"}
-                  </p>
-
-                  <p className="font-semibold text-teal">
-                    {form.role_title || "Role title"}
-                  </p>
-
-                  <p className="mt-2 max-w-xl text-sm leading-relaxed text-gray-600">
-                    {form.short_description ||
-                      "Short staff description will appear here."}
-                  </p>
-                </div>
-              </div>
+              <button
+                type="button"
+                onClick={() => void handleSave()}
+                disabled={saving}
+                className="flex-1 rounded-lg bg-navy py-2.5 text-sm font-semibold text-white hover:bg-navy-700 disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save"}
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={isSaving}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-navy px-5 py-3 text-sm font-bold text-white hover:bg-navy-700 disabled:opacity-60 md:w-auto"
-            >
-              <Save size={16} />
-              {isSaving
-                ? "Saving..."
-                : selectedStaff
-                  ? "Update Staff"
-                  : "Create Staff"}
-            </button>
-          </form>
-        </section>
-      </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -814,35 +714,28 @@ type TextInputProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  placeholder?: string;
   type?: string;
-  required?: boolean;
 };
 
 function TextInput({
   label,
   value,
   onChange,
-  placeholder,
   type = "text",
-  required,
 }: TextInputProps) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-navy">
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-charcoal">
         {label}
-        {required ? <span className="text-red-500"> *</span> : null}
-      </span>
+      </label>
 
       <input
         type={type}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        required={required}
-        className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
+        className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
       />
-    </label>
+    </div>
   );
 }
 
@@ -850,79 +743,104 @@ type TextAreaProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  placeholder?: string;
-  rows?: number;
 };
 
-function TextArea({
-  label,
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-}: TextAreaProps) {
+function TextArea({ label, value, onChange }: TextAreaProps) {
   return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-navy">
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-charcoal">
         {label}
-      </span>
+      </label>
 
       <textarea
+        rows={3}
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full resize-y rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
+        className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
       />
-    </label>
+    </div>
   );
 }
 
 type CheckboxFieldProps = {
   label: string;
-  description: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
 };
 
-function CheckboxField({
-  label,
-  description,
-  checked,
-  onChange,
-}: CheckboxFieldProps) {
+function CheckboxField({ label, checked, onChange }: CheckboxFieldProps) {
   return (
-    <label className="flex cursor-pointer gap-3 rounded-xl border border-gray-100 bg-white p-4">
+    <label className="flex items-center gap-2 text-sm font-medium text-charcoal">
       <input
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="mt-1 h-4 w-4 rounded border-gray-300 text-teal focus:ring-teal"
+        className="h-4 w-4 rounded border-gray-300 text-teal focus:ring-teal"
       />
 
-      <span>
-        <span className="block text-sm font-semibold text-navy">{label}</span>
-        <span className="block text-xs leading-relaxed text-gray-500">
-          {description}
-        </span>
-      </span>
+      {label}
     </label>
   );
 }
 
-type StatusPillProps = {
+type ToggleButtonProps = {
   active: boolean;
-  label: string;
+  activeLabel: string;
+  inactiveLabel: string;
+  onClick: () => void;
 };
 
-function StatusPill({ active, label }: StatusPillProps) {
+function ToggleButton({
+  active,
+  activeLabel,
+  inactiveLabel,
+  onClick,
+}: ToggleButtonProps) {
   return (
-    <span
-      className={`rounded-full px-2 py-1 text-[11px] font-bold ${
-        active ? "bg-teal-50 text-teal" : "bg-gray-100 text-gray-500"
-      }`}
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-xs font-medium"
     >
-      {label}
-    </span>
+      {active ? (
+        <>
+          <ToggleRight size={16} className="text-teal" />
+          <span className="text-teal">{activeLabel}</span>
+        </>
+      ) : (
+        <>
+          <ToggleLeft size={16} className="text-gray-400" />
+          <span className="text-gray-400">{inactiveLabel}</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+type VisibilityButtonProps = {
+  visible: boolean;
+  label: string;
+  onClick: () => void;
+};
+
+function VisibilityButton({ visible, label, onClick }: VisibilityButtonProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex items-center gap-1.5 text-xs font-medium"
+    >
+      {visible ? (
+        <>
+          <Eye size={15} className="text-teal" />
+          <span className="text-teal">{label}</span>
+        </>
+      ) : (
+        <>
+          <EyeOff size={15} className="text-gray-400" />
+          <span className="text-gray-400">{label}</span>
+        </>
+      )}
+    </button>
   );
 }

@@ -1,7 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState, type ComponentType } from "react";
+import {
+  BarChart2,
+  BookOpen,
+  Calendar,
+  Edit3,
+  FileText,
+  FolderOpen,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  MessageSquare,
+  MessagesSquare,
+  ShieldCheck,
+  Star,
+  UserCheck,
+  UserCircle,
+  Users,
+  X,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { useAuth } from "@/hooks/use-auth";
 import {
@@ -17,12 +38,66 @@ type DashboardSidebarProps = {
   className?: string;
 };
 
-const getNavigationByRole = (role?: UserRole) => {
+type NavigationItem = {
+  label: string;
+  href: string;
+};
+
+type SidebarContentProps = {
+  className?: string;
+  onClose?: () => void;
+};
+
+type SidebarIcon = ComponentType<{ size?: number; className?: string }>;
+
+const adminIconByHref: Record<string, SidebarIcon> = {
+  [routes.admin.dashboard]: LayoutDashboard,
+  [routes.admin.requests]: FileText,
+  [routes.admin.consultations]: Calendar,
+  [routes.admin.clients]: Users,
+  [routes.admin.accountants]: UserCheck,
+  [routes.admin.documents]: FolderOpen,
+  [routes.admin.messages]: MessagesSquare,
+  [routes.admin.profile]: UserCircle,
+  [routes.admin.auditLog]: ShieldCheck,
+  [routes.admin.contentManager]: Edit3,
+  [routes.admin.services]: BookOpen,
+  [routes.admin.staff]: Users,
+  [routes.admin.blog]: MessageSquare,
+  [routes.admin.testimonials]: Star,
+  [routes.admin.socialLinks]: Edit3,
+  [routes.admin.statistics]: BarChart2,
+  [routes.admin.settings]: ShieldCheck,
+};
+
+const clientIconByHref: Record<string, SidebarIcon> = {
+  [routes.client.dashboard]: LayoutDashboard,
+  [routes.client.requests]: FileText,
+  [routes.client.documents]: FolderOpen,
+  [routes.client.messages]: MessagesSquare,
+  [routes.client.profile]: UserCircle,
+};
+
+const accountantIconByHref: Record<string, SidebarIcon> = {
+  [routes.accountant.dashboard]: LayoutDashboard,
+  [routes.accountant.assignedWork]: FileText,
+  [routes.accountant.messages]: MessagesSquare,
+};
+
+const getNavigationByRole = (role?: UserRole): NavigationItem[] => {
   if (role === "admin") return adminNavigation;
   if (role === "client") return clientNavigation;
   if (role === "accountant") return accountantNavigation;
 
   return [];
+};
+
+const getIconByRoleAndHref = (role: UserRole | undefined, href: string) => {
+  if (role === "admin") return adminIconByHref[href] || FileText;
+  if (role === "client") return clientIconByHref[href] || FileText;
+  if (role === "accountant") return accountantIconByHref[href] || FileText;
+
+  return FileText;
 };
 
 const getRoleLabel = (role?: UserRole) => {
@@ -33,71 +108,143 @@ const getRoleLabel = (role?: UserRole) => {
   return "User";
 };
 
-export function DashboardSidebar({ className }: DashboardSidebarProps) {
+function SidebarContent({ className, onClose }: SidebarContentProps) {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, logout } = useAuth();
 
   const navigation = getNavigationByRole(user?.role);
+  const displayName = user?.full_name || user?.email || "User";
+
+  const handleLogout = () => {
+    logout();
+    toast.success("Logged out.");
+    router.replace(routes.login);
+    onClose?.();
+  };
 
   return (
     <aside
       className={cn(
-        "hidden min-h-screen w-72 shrink-0 border-r border-slate-200 bg-white lg:block",
+        "flex h-full min-h-screen w-72 shrink-0 flex-col overflow-hidden bg-navy text-white",
         className,
       )}
     >
-      <div className="flex h-full flex-col">
-        <div className="border-b border-slate-200 px-6 py-5">
-          <Link href={routes.home} className="block">
-            <p className="text-lg font-bold tracking-tight text-[#0F2742]">
-              Kivu Advisory
-            </p>
-            <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-[#C99A35]">
-              Professional portal
-            </p>
-          </Link>
-        </div>
+      <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+        <Link href={routes.home} onClick={onClose} className="flex items-center">
+          <span className="text-xl font-bold tracking-tight text-white">
+            Kivu Advisory
+          </span>
+          <span className="mb-2.5 ml-1 h-1.5 w-1.5 rounded-full bg-gold" />
+        </Link>
 
-        <nav className="flex-1 space-y-1 px-4 py-5">
-          {navigation.map((item) => {
-            const isActive =
-              pathname === item.href || pathname.startsWith(`${item.href}/`);
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-white lg:hidden"
+          >
+            <X size={20} />
+          </button>
+        ) : null}
+      </div>
 
-            return (
+      <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
+        {navigation.map((item, index) => {
+          const Icon = getIconByRoleAndHref(user?.role, item.href);
+          const active =
+            pathname === item.href || pathname.startsWith(`${item.href}/`);
+
+          const shouldAddSeparator =
+            user?.role === "admin" &&
+            item.href === routes.admin.contentManager;
+
+          return (
+            <div key={item.href}>
+              {shouldAddSeparator ? (
+                <div className="my-3 border-t border-white/10" />
+              ) : null}
+
               <Link
-                key={item.href}
                 href={item.href}
+                onClick={onClose}
                 className={cn(
-                  "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-[#0F2742] text-white"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+                  "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
+                  active
+                    ? "bg-teal text-white"
+                    : "text-gray-400 hover:bg-white/10 hover:text-white",
                 )}
               >
-                {item.label}
+                <Icon size={16} className="shrink-0" />
+                <span>{item.label}</span>
               </Link>
-            );
-          })}
-        </nav>
-
-        <div className="border-t border-slate-200 p-4">
-          <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#0F2742] text-sm font-semibold text-white">
-              {getSafeInitials(user?.full_name || user?.email || "User")}
             </div>
+          );
+        })}
+      </nav>
 
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-950">
-                {user?.full_name || "Logged in user"}
-              </p>
-              <p className="truncate text-xs text-slate-500">
-                {getRoleLabel(user?.role)}
-              </p>
-            </div>
+      <div className="border-t border-white/10 px-4 py-4">
+        <div className="mb-3 flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-teal text-sm font-bold text-white">
+            {getSafeInitials(displayName)}
+          </div>
+
+          <div className="min-w-0">
+            <p className="truncate text-sm font-medium text-white">
+              {displayName}
+            </p>
+
+            <p className="truncate text-xs capitalize text-gray-400">
+              {getRoleLabel(user?.role)}
+            </p>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="flex w-full items-center gap-2 text-xs text-gray-400 transition-colors hover:text-red-400"
+        >
+          <LogOut size={13} />
+          Log Out
+        </button>
       </div>
     </aside>
+  );
+}
+
+export function DashboardSidebar({ className }: DashboardSidebarProps) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  return (
+    <>
+      <div className="hidden lg:block">
+        <SidebarContent className={className} />
+      </div>
+
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg bg-navy text-white shadow-md lg:hidden"
+      >
+        <Menu size={18} />
+      </button>
+
+      {mobileOpen ? (
+        <>
+          <button
+            type="button"
+            aria-label="Close sidebar"
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            onClick={() => setMobileOpen(false)}
+          />
+
+          <div className="fixed left-0 top-0 z-50 h-full lg:hidden">
+            <SidebarContent onClose={() => setMobileOpen(false)} />
+          </div>
+        </>
+      ) : null}
+    </>
   );
 }
 

@@ -7,5 +7,5 @@ type ClientLayoutProps = {
 };
 
 export default function ClientLayout({ children }: ClientLayoutProps) {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <DashboardLayout variant="client">{children}</DashboardLayout>;
 }

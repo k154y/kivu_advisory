@@ -7,5 +7,5 @@ type AccountantLayoutProps = {
 };
 
 export default function AccountantLayout({ children }: AccountantLayoutProps) {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <DashboardLayout variant="accountant">{children}</DashboardLayout>;
 }

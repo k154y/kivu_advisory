@@ -16,29 +16,22 @@ export const routes = {
   admin: {
     dashboard: "/admin/dashboard",
 
-    accountants: "/admin/accountants",
-    accountantCreate: "/admin/accountants/create",
-    accountantDetail: (id: string) => `/admin/accountants/${id}`,
-
-    clients: "/admin/clients",
-    clientDetail: (id: string) => `/admin/clients/${id}`,
-
-    services: "/admin/services",
-    serviceCreate: "/admin/services/create",
-    serviceDetail: (id: string) => `/admin/services/${id}`,
-
-    staff: "/admin/staff",
-
     requests: "/admin/requests",
     requestDetail: (id: string) => `/admin/requests/${id}`,
 
     consultations: "/admin/consultations",
 
-    blog: "/admin/blog",
-    blogCreate: "/admin/blog/create",
-    blogDetail: (id: string) => `/admin/blog/${id}`,
+    clients: "/admin/clients",
+    clientDetail: (id: string) => `/admin/clients/${id}`,
 
-    testimonials: "/admin/testimonials",
+    accountants: "/admin/accountants",
+    accountantCreate: "/admin/accountants/create",
+    accountantDetail: (id: string) => `/admin/accountants/${id}`,
+
+    documents: "/admin/documents",
+    messages: "/admin/messages",
+    profile: "/admin/profile",
+    auditLog: "/admin/audit-log",
 
     contentManager: "/admin/content",
     content: {
@@ -48,6 +41,20 @@ export const routes = {
       footer: "/admin/content/footer",
       socialMedia: "/admin/content/social-media",
     },
+
+    services: "/admin/services",
+    serviceCreate: "/admin/services/create",
+    serviceDetail: (id: string) => `/admin/services/${id}`,
+
+    staff: "/admin/staff",
+
+    blog: "/admin/blog",
+    blogCreate: "/admin/blog/create",
+    blogDetail: (id: string) => `/admin/blog/${id}`,
+
+    testimonials: "/admin/testimonials",
+    socialLinks: "/admin/content/social-media",
+    statistics: "/admin/statistics",
 
     settings: "/admin/settings",
   },
@@ -80,15 +87,22 @@ export const publicNavigation = [
 
 export const adminNavigation = [
   { label: "Dashboard", href: routes.admin.dashboard },
-  { label: "Accountants", href: routes.admin.accountants },
-  { label: "Clients", href: routes.admin.clients },
   { label: "Service Requests", href: routes.admin.requests },
+  { label: "Consultations", href: routes.admin.consultations },
+  { label: "Clients", href: routes.admin.clients },
+  { label: "Accountants", href: routes.admin.accountants },
+  { label: "My Documents", href: routes.admin.documents },
+  { label: "Messages", href: routes.admin.messages },
+  { label: "My Profile", href: routes.admin.profile },
+  { label: "Audit Log", href: routes.admin.auditLog },
+
+  { label: "Website Content", href: routes.admin.contentManager },
   { label: "Services", href: routes.admin.services },
   { label: "Staff", href: routes.admin.staff },
-  { label: "Consultations", href: routes.admin.consultations },
-  { label: "Blog", href: routes.admin.blog },
-  { label: "Website Content", href: routes.admin.contentManager },
+  { label: "Blog Posts", href: routes.admin.blog },
   { label: "Testimonials", href: routes.admin.testimonials },
+  { label: "Social Links", href: routes.admin.socialLinks },
+  { label: "Statistics", href: routes.admin.statistics },
   { label: "Settings", href: routes.admin.settings },
 ];
 

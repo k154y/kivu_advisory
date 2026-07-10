@@ -7,5 +7,5 @@ type AdminLayoutProps = {
 };
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  return <DashboardLayout>{children}</DashboardLayout>;
+  return <DashboardLayout variant="admin">{children}</DashboardLayout>;
 }

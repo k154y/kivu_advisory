@@ -34,12 +34,12 @@ export const emptyAccountantForm: AccountantFormState = {
 };
 
 export const adminAccountantPaths = {
-  list: "/admin/accountants",
+  list: "/admin/accountant-accounts",
   create: "/admin/accountants",
   detail: (id: string) =>
-    `/admin/accountants/detail?id=${encodeURIComponent(id)}`,
+    `/admin/accountant-accounts/detail?id=${encodeURIComponent(id)}`,
   status: (id: string) =>
-    `/admin/accountants/status?id=${encodeURIComponent(id)}`,
+    `/admin/accountant-accounts/status?id=${encodeURIComponent(id)}`,
 };
 
 export function getAccountantItems(

@@ -36,16 +36,13 @@ func RegisterRoutes(
 	)
 
 	mux.Handle(
-		api+"/admin/accountants",
-		methodOnlyHandler(
-			http.MethodPost,
-			middleware.RequireAuth(tokenVerifier)(
-				middleware.RequireRole(middleware.RoleAdmin)(
-					http.HandlerFunc(handler.CreateAccountant),
-				),
-			),
-		),
-	)
+        http.MethodPost+" "+api+"/admin/accountants",
+        middleware.RequireAuth(tokenVerifier)(
+                middleware.RequireRole(middleware.RoleAdmin)(
+                        http.HandlerFunc(handler.CreateAccountant),
+                ),
+        ),
+)
 }
 
 func methodOnly(method string, handler http.HandlerFunc) http.HandlerFunc {

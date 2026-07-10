@@ -10,14 +10,18 @@ import { AuthProvider } from "@/providers/auth-provider";
 
 type DashboardLayoutProps = {
   children: ReactNode;
+  variant?: "admin" | "accountant" | "client";
 };
 
-function DashboardShell({ children }: DashboardLayoutProps) {
+function DashboardShell({
+  children,
+  variant = "admin",
+}: DashboardLayoutProps) {
   const { isLoading, user } = useAuth();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
+      <div className="min-h-screen bg-lightgray p-6">
         <LoadingState
           title="Checking access"
           description="Please wait while we verify your dashboard access."
@@ -28,7 +32,7 @@ function DashboardShell({ children }: DashboardLayoutProps) {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-slate-50 p-6">
+      <div className="min-h-screen bg-lightgray p-6">
         <LoadingState
           title="Redirecting to login"
           description="You need to log in before accessing this dashboard."
@@ -37,16 +41,34 @@ function DashboardShell({ children }: DashboardLayoutProps) {
     );
   }
 
+  if (variant === "client") {
+    return (
+      <div className="min-h-screen bg-lightgray">
+        <DashboardTopbar variant="client" />
+
+        <main className="px-4 py-8 sm:px-6">
+          <div className="mx-auto w-full max-w-5xl">{children}</div>
+        </main>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-lightgray">
       <div className="flex min-h-screen">
         <DashboardSidebar />
 
-        <div className="flex min-w-0 flex-1 flex-col">
-          <DashboardTopbar />
-
-          <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-            <div className="mx-auto w-full max-w-7xl">{children}</div>
+        <div className="min-w-0 flex-1">
+          <main className="px-4 py-16 sm:px-6 sm:py-8 lg:px-8">
+            <div
+              className={
+                variant === "accountant"
+                  ? "mx-auto w-full max-w-5xl"
+                  : "mx-auto w-full max-w-7xl"
+              }
+            >
+              {children}
+            </div>
           </main>
         </div>
       </div>
@@ -54,10 +76,13 @@ function DashboardShell({ children }: DashboardLayoutProps) {
   );
 }
 
-export function DashboardLayout({ children }: DashboardLayoutProps) {
+export function DashboardLayout({
+  children,
+  variant = "admin",
+}: DashboardLayoutProps) {
   return (
     <AuthProvider>
-      <DashboardShell>{children}</DashboardShell>
+      <DashboardShell variant={variant}>{children}</DashboardShell>
     </AuthProvider>
   );
 }
