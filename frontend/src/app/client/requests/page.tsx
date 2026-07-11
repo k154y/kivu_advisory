@@ -38,7 +38,7 @@ export default function ClientRequestsPage() {
       setError(null);
 
       try {
-        const result = await api.get(endpoints.client.serviceRequests);
+        const result = await api.get(`${endpoints.client.serviceRequests}?page_size=100`);
 
         if (!cancelled) {
           setRequests(extractItems<ServiceRequest>(result.data));

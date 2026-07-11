@@ -20,6 +20,7 @@ export const routes = {
     requestDetail: (id: string) => `/admin/requests/${id}`,
 
     consultations: "/admin/consultations",
+    consultationDetail: (id: string) => `/admin/consultations/${id}`,
 
     clients: "/admin/clients",
     clientDetail: (id: string) => `/admin/clients/${id}`,
@@ -67,13 +68,13 @@ export const routes = {
     documents: "/client/documents",
     messages: "/client/messages",
   },
-
-  accountant: {
-    dashboard: "/accountant/dashboard",
-    assignedWork: "/accountant/assigned-work",
-    assignmentDetail: (id: string) => `/accountant/assigned-work/${id}`,
-    messages: "/accountant/messages",
-  },
+accountant: {
+  dashboard: "/accountant/dashboard",
+  assignedWork: "/accountant/assigned-work",
+  assignmentDetail: (id: string) => `/accountant/assigned-work/${id}`,
+  messages: "/accountant/messages",
+  profile: "/accountant/profile",
+},
 } as const;
 
 export const publicNavigation = [
@@ -126,6 +127,7 @@ export const accountantNavigation = [
   { label: "Dashboard", href: routes.accountant.dashboard },
   { label: "Assigned Work", href: routes.accountant.assignedWork },
   { label: "Messages", href: routes.accountant.messages },
+  { label: "My Profile", href: routes.accountant.profile },
 ];
 
 export const roleDashboardRoutes = {

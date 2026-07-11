@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
@@ -16,7 +17,30 @@ import (
 const maxStaffRequestBodyBytes = 1 << 20
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "staff",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 type staffMemberRequest struct {
@@ -42,9 +66,10 @@ type staffMemberRequest struct {
 	IsActive                   bool   `json:"is_active"`
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
+		service:     service,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -163,6 +188,8 @@ func (h *Handler) AdminStaffStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.recordAudit(r, "staff.status_updated", id, "Staff member visibility/status updated")
+
 	response.OK(w, "staff member status updated successfully", item)
 }
 
@@ -234,6 +261,8 @@ func (h *Handler) createAdminStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.recordAudit(r, "staff.created", item.ID, "Staff member created: "+item.FullName)
+
 	response.Created(w, "staff member created successfully", item)
 }
 
@@ -296,6 +325,8 @@ func (h *Handler) updateAdminStaff(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.recordAudit(r, "staff.updated", item.ID, "Staff member updated: "+item.FullName)
+
 	response.OK(w, "staff member updated successfully", item)
 }
 
@@ -310,6 +341,8 @@ func (h *Handler) deleteAdminStaff(w http.ResponseWriter, r *http.Request) {
 		respondError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "staff.deleted", id, "Staff member deleted")
 
 	response.OK(w, "staff member deleted successfully", map[string]string{
 		"id": id,

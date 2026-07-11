@@ -98,16 +98,6 @@ export const registerClientSchema = z.object({
   }),
 });
 
-export const createAccountantSchema = z.object({
-  full_name: requiredText("Full name").min(
-    2,
-    "Full name must be at least 2 characters.",
-  ),
-  email: emailSchema,
-  phone: phoneSchema,
-  password: strongPasswordSchema,
-});
-
 type RequesterContactValues = {
   requester_email?: string;
   requester_phone?: string;
@@ -419,7 +409,6 @@ export const searchSchema = z.object({
 
 export type LoginFormValues = z.infer<typeof loginSchema>;
 export type RegisterClientFormValues = z.infer<typeof registerClientSchema>;
-export type CreateAccountantFormValues = z.infer<typeof createAccountantSchema>;
 
 export type VisitorServiceRequestFormValues = z.infer<
   typeof visitorServiceRequestSchema

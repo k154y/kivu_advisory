@@ -3,6 +3,7 @@ package consultation
 import (
 	"context"
 	"strings"
+	"net/http"
 
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 )
@@ -71,6 +72,14 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListConsultationsFilter)
 	}
 
 	return PublicConsultations(consultations), totalItems, nil
+}
+
+func (s *Service) CountByStatus(ctx context.Context) (map[string]int, error) {
+	if s == nil || s.repo == nil {
+		return nil, apperrors.Internal("consultation service is not initialized")
+	}
+
+	return s.repo.CountByStatus(ctx)
 }
 
 func (s *Service) UpdateAdmin(ctx context.Context, id string, input UpdateConsultationInput) (*PublicConsultation, error) {
@@ -142,6 +151,100 @@ func (s *Service) DeleteAdmin(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }
 
+func (s *Service) ListAccountant(ctx context.Context, accountantUserID string, filter ListConsultationsFilter) ([]PublicConsultation, int, error) {
+	if s == nil || s.repo == nil {
+		return nil, 0, apperrors.Internal("consultation service is not initialized")
+	}
+
+	accountantUserID = strings.TrimSpace(accountantUserID)
+	if accountantUserID == "" {
+		return nil, 0, apperrors.InvalidInput("accountant user id is required")
+	}
+
+	filter = filter.Normalize()
+	filter.AssignedToUserID = accountantUserID
+
+	consultations, totalItems, err := s.repo.List(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return PublicConsultations(consultations), totalItems, nil
+}
+
+func (s *Service) GetAccountantByID(ctx context.Context, accountantUserID string, id string) (*PublicConsultation, error) {
+	if s == nil || s.repo == nil {
+		return nil, apperrors.Internal("consultation service is not initialized")
+	}
+
+	accountantUserID = strings.TrimSpace(accountantUserID)
+	id = strings.TrimSpace(id)
+
+	if accountantUserID == "" {
+		return nil, apperrors.InvalidInput("accountant user id is required")
+	}
+
+	if id == "" {
+		return nil, apperrors.InvalidInput("consultation id is required")
+	}
+
+	consultation, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(consultation.AssignedToUserID) != accountantUserID {
+		return nil, apperrors.Forbidden("you do not have permission to access this consultation")
+	}
+
+	publicConsultation := consultation.Public()
+
+	return &publicConsultation, nil
+}
+
+func (s *Service) UpdateStatusAccountant(ctx context.Context, accountantUserID string, id string, status string) (*PublicConsultation, error) {
+	if s == nil || s.repo == nil {
+		return nil, apperrors.Internal("consultation service is not initialized")
+	}
+
+	accountantUserID = strings.TrimSpace(accountantUserID)
+	id = strings.TrimSpace(id)
+	status = NormalizeStatus(status)
+
+	if accountantUserID == "" {
+		return nil, apperrors.InvalidInput("accountant user id is required")
+	}
+
+	if id == "" {
+		return nil, apperrors.InvalidInput("consultation id is required")
+	}
+
+	if !IsValidStatus(status) {
+		return nil, apperrors.InvalidInput("invalid consultation status")
+	}
+
+	existingConsultation, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if strings.TrimSpace(existingConsultation.AssignedToUserID) != accountantUserID {
+		return nil, apperrors.Forbidden("you do not have permission to update this consultation")
+	}
+
+	updatedConsultation, err := s.repo.UpdateStatus(ctx, id, UpdateStatusInput{
+		Status:          status,
+		HandledByUserID: accountantUserID,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	publicConsultation := updatedConsultation.Public()
+
+	return &publicConsultation, nil
+}
+
 func publicConsultationForVisitor(item *Consultation) PublicConsultation {
 	if item == nil {
 		return PublicConsultation{}
@@ -157,4 +260,12 @@ func publicConsultationForVisitor(item *Consultation) PublicConsultation {
 	publicConsultation.ClosedAt = nil
 
 	return publicConsultation
+}
+
+func forbidden(message string) error {
+	return &apperrors.AppError{
+		Code:       "forbidden",
+		Message:    message,
+		StatusCode: http.StatusForbidden,
+	}
 }

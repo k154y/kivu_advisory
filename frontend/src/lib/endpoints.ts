@@ -58,6 +58,13 @@ public: {
   }) => withQuery("/staff", params),
 
   staffDetail: (slug: string) => withQuery("/staff/detail", { slug }),
+
+  testimonials: (params?: {
+    search?: string;
+    featured?: boolean;
+    page?: number;
+    page_size?: number;
+  }) => withQuery("/testimonials", params),
 },
 
   admin: {
@@ -78,6 +85,7 @@ public: {
     serviceRequests: (params?: {
       search?: string;
       status?: string;
+      client_id?: string;
       page?: number;
       page_size?: number;
     }) => withQuery("/admin/service-requests", params),
@@ -153,6 +161,27 @@ public: {
     staffDetail: (id: string) => withQuery("/admin/staff/detail", { id }),
 
     staffStatus: (id: string) => withQuery("/admin/staff/status", { id }),
+
+    testimonials: (params?: {
+      search?: string;
+      is_featured?: boolean;
+      is_active?: boolean;
+      page?: number;
+      page_size?: number;
+    }) => withQuery("/admin/testimonials", params),
+    testimonialDetail: (id: string) =>
+      withQuery("/admin/testimonials/detail", { id }),
+    testimonialStatus: (id: string) =>
+      withQuery("/admin/testimonials/status", { id }),
+
+    dashboardStats: "/admin/dashboard/stats",
+
+    auditLog: (params?: {
+      entity_type?: string;
+      actor_user_id?: string;
+      page?: number;
+      page_size?: number;
+    }) => withQuery("/admin/audit-log", params),
     },
 
   accountant: {
@@ -172,6 +201,9 @@ public: {
   documents: {
     list: (params?: {
       service_request_id?: string;
+      visibility?: string;
+      document_type?: string;
+      status?: string;
       page?: number;
       page_size?: number;
     }) => withQuery("/documents", params),
@@ -191,37 +223,31 @@ public: {
     markRead: (id: string) => withQuery("/messages/read", { id }),
   },
 
+  notifications: {
+    list: (params?: {
+      notification_type?: string;
+      is_read?: boolean;
+      page?: number;
+      page_size?: number;
+    }) => withQuery("/notifications", params),
+    unreadCount: "/notifications/unread-count",
+    markRead: (id: string) => withQuery("/notifications/read", { id }),
+    markAllRead: "/notifications/read-all",
+    detail: (id: string) => withQuery("/notifications/detail", { id }),
+  },
+
   /*
-   * These features are required by the project but not fully confirmed
-   * as callable frontend endpoints from the pasted backend routes.
+   * These features are required by the project but not confirmed
+   * as callable frontend endpoints from the backend routes.
    * We will not call them until backend support is added.
    */
   missingBackend: {
-    notifications: {
-      list: "/notifications",
-      markRead: (id: string) => withQuery("/notifications/read", { id }),
-    },
-
-    staff: {
-      publicList: "/staff",
-      adminList: "/admin/staff",
-    },
-
     clientTaxAccounts: {
       list: (clientId: string) =>
         withQuery("/admin/client-tax-accounts", { client_id: clientId }),
       create: "/admin/client-tax-accounts",
       detail: (id: string) =>
         withQuery("/admin/client-tax-accounts/detail", { id }),
-    },
-
-    testimonials: {
-      publicList: "/testimonials",
-      adminList: "/admin/testimonials",
-      adminDetail: (id: string) =>
-        withQuery("/admin/testimonials/detail", { id }),
-      adminStatus: (id: string) =>
-        withQuery("/admin/testimonials/status", { id }),
     },
   },
 } as const;

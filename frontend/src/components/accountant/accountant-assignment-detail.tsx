@@ -51,6 +51,7 @@ export function AccountantAssignmentDetail({
 }: AccountantAssignmentDetailProps) {
   const [status, setStatus] = useState(assignment.status);
   const [notes, setNotes] = useState(assignment.notes || "");
+  const [internalNotes, setInternalNotes] = useState(assignment.internal_notes || "");
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -58,18 +59,16 @@ export function AccountantAssignmentDetail({
     setIsSaving(true);
 
     try {
-      await api.patch(endpoints.accountant.assignmentStatus(assignment.id), {
-        status,
-        notes: notes.trim() || undefined,
-      });
+      const result = await api.patch<AccountantAssignmentDetail>(
+        endpoints.accountant.assignmentStatus(assignment.id),
+        {
+          status,
+          notes: notes.trim() || undefined,
+          internal_notes: internalNotes.trim() || undefined,
+        },
+      );
 
-      const nextAssignment = {
-        ...assignment,
-        status,
-        notes: notes.trim(),
-      };
-
-      onUpdated?.(nextAssignment);
+      onUpdated?.(result.data ?? { ...assignment, status, notes: notes.trim(), internal_notes: internalNotes.trim() });
       toast.success("Assignment updated successfully.");
     } catch (error) {
       toast.error(getSafeErrorMessage(error, "Unable to update this assignment."));
@@ -110,9 +109,15 @@ export function AccountantAssignmentDetail({
             <DetailRow label="Updated" value={formatDateTime(assignment.updated_at)} />
           </dl>
           <div className="lg:col-span-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
-            <h3 className="text-sm font-semibold text-slate-900">Work notes</h3>
+            <h3 className="text-sm font-semibold text-slate-900">Progress notes</h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              {assignment.internal_notes || assignment.notes || "No notes have been added yet."}
+              {assignment.notes || "No notes have been added yet."}
+            </p>
+          </div>
+          <div className="lg:col-span-2 rounded-2xl border border-slate-100 bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold text-slate-900">Internal notes</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {assignment.internal_notes || "No internal notes have been added yet."}
             </p>
           </div>
         </CardContent>
@@ -138,6 +143,12 @@ export function AccountantAssignmentDetail({
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               placeholder="Share what has been completed, blocked, or needs review."
+            />
+            <Textarea
+              label="Internal notes"
+              value={internalNotes}
+              onChange={(event) => setInternalNotes(event.target.value)}
+              placeholder="Private notes for internal record-keeping."
             />
             <Button
               type="submit"

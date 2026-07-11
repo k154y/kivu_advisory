@@ -32,7 +32,6 @@ export function HomeHero() {
 
   const heroImages = useMemo(() => {
     const images = [mainImage, ...backupHeroImages].filter(Boolean);
-
     return Array.from(new Set(images));
   }, [mainImage]);
 

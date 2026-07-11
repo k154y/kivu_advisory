@@ -165,6 +165,14 @@ func (s *Service) ListAdmin(ctx context.Context, filter ListServiceRequestsFilte
 	return PublicServiceRequests(requests), totalItems, nil
 }
 
+func (s *Service) CountByStatus(ctx context.Context) (map[string]int, error) {
+	if s == nil || s.repo == nil {
+		return nil, apperrors.Internal("service request service is not initialized")
+	}
+
+	return s.repo.CountByStatus(ctx)
+}
+
 func (s *Service) ListClient(ctx context.Context, clientID string, filter ListServiceRequestsFilter) ([]PublicServiceRequest, int, error) {
 	if s == nil || s.repo == nil {
 		return nil, 0, apperrors.Internal("service request service is not initialized")

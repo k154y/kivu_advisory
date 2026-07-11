@@ -79,8 +79,20 @@ func (r *PostgresRepository) Create(ctx context.Context, input CreatePostInput) 
 			author_user_id,
 			published_at
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-			CASE WHEN $8 = 'published' THEN NOW() ELSE NULL END
+		VALUES (
+			$1,
+			$2,
+			$3,
+			$4,
+			$5,
+			$6::text[],
+			$7,
+			$8::varchar,
+			$9,
+			$10,
+			$11,
+			$12,
+			CASE WHEN $8::text = 'published' THEN NOW() ELSE NULL END
 		)
 		RETURNING %s
 	`, postSelectColumns)
@@ -244,16 +256,16 @@ func (r *PostgresRepository) Update(ctx context.Context, id string, input Update
 			excerpt = $3,
 			body = $4,
 			category = $5,
-			tags = $6,
+			tags = $6::text[],
 			featured_image_url = $7,
-			status = $8,
+			status = $8::varchar,
 			is_featured = $9,
 			meta_title = $10,
 			meta_description = $11,
 			author_user_id = $12,
 			published_at = CASE
-				WHEN $8 = 'published' AND published_at IS NULL THEN NOW()
-				WHEN $8 <> 'published' THEN NULL
+				WHEN $8::text = 'published' AND published_at IS NULL THEN NOW()
+				WHEN $8::text <> 'published' THEN NULL
 				ELSE published_at
 			END,
 			updated_at = NOW()
@@ -303,10 +315,10 @@ func (r *PostgresRepository) UpdateStatus(ctx context.Context, id string, status
 	query := fmt.Sprintf(`
 		UPDATE blog_posts
 		SET
-			status = $1,
+			status = $1::varchar,
 			published_at = CASE
-				WHEN $1 = 'published' AND published_at IS NULL THEN NOW()
-				WHEN $1 <> 'published' THEN NULL
+				WHEN $1::text = 'published' AND published_at IS NULL THEN NOW()
+				WHEN $1::text <> 'published' THEN NULL
 				ELSE published_at
 			END,
 			updated_at = NOW()
@@ -412,7 +424,7 @@ func mapPostgresError(err error) error {
 		}
 	}
 
-	return apperrors.InternalWrap(err, "database operation failed")
+	return apperrors.InternalWrap(err, "database operation failed: "+err.Error())
 }
 
 var _ = time.Time{}

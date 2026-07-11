@@ -11,19 +11,23 @@ import (
 	"github.com/kyves/kivu-advisory/backend/internal/accountant"
 	"github.com/kyves/kivu-advisory/backend/internal/notification"
 	"github.com/kyves/kivu-advisory/backend/internal/staff"
+	"github.com/kyves/kivu-advisory/backend/internal/sociallink"
 
 	"github.com/kyves/kivu-advisory/backend/internal/assignment"
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	"github.com/kyves/kivu-advisory/backend/internal/auth"
 	"github.com/kyves/kivu-advisory/backend/internal/blog"
 	"github.com/kyves/kivu-advisory/backend/internal/client"
 	"github.com/kyves/kivu-advisory/backend/internal/config"
 	"github.com/kyves/kivu-advisory/backend/internal/consultation"
 	"github.com/kyves/kivu-advisory/backend/internal/content"
+	"github.com/kyves/kivu-advisory/backend/internal/dashboard"
 	"github.com/kyves/kivu-advisory/backend/internal/document"
 	"github.com/kyves/kivu-advisory/backend/internal/message"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	"github.com/kyves/kivu-advisory/backend/internal/servicecatalog"
 	"github.com/kyves/kivu-advisory/backend/internal/servicerequest"
+	"github.com/kyves/kivu-advisory/backend/internal/testimonial"
 	"github.com/kyves/kivu-advisory/backend/internal/user"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
 )
@@ -116,6 +120,14 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	blogRepository := blog.NewPostgresRepository(options.DatabasePool)
 	blogService := blog.NewServiceWithNotifications(blogRepository, notificationService)
 
+	testimonialRepository := testimonial.NewPostgresRepository(options.DatabasePool)
+	testimonialService := testimonial.NewService(testimonialRepository)
+
+	auditLogRepository := auditlog.NewPostgresRepository(options.DatabasePool)
+	auditLogService := auditlog.NewService(auditLogRepository)
+
+	socialLinkRepository := sociallink.NewPostgresRepository(options.DatabasePool)
+	socialLinkService := sociallink.NewService(socialLinkRepository)
 
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -132,20 +144,28 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	authService := auth.NewService(userService, tokenManager, options.Config.Password.MinLength)
 	authService.SetClientService(clientService)
 
-	authHandler := auth.NewHandler(authService)
+	authHandler := auth.NewHandler(authService, auditLogService)
 	clientHandler := client.NewHandler(clientService)
-	serviceCatalogHandler := servicecatalog.NewHandler(serviceCatalogService)
-	serviceRequestHandler := servicerequest.NewHandler(serviceRequestService, clientService)
-	assignmentHandler := assignment.NewHandler(assignmentService)
+	serviceCatalogHandler := servicecatalog.NewHandler(serviceCatalogService, auditLogService)
+	serviceRequestHandler := servicerequest.NewHandler(serviceRequestService, clientService, auditLogService)
+	assignmentHandler := assignment.NewHandler(assignmentService, auditLogService)
 	documentHandler := document.NewHandler(documentService, clientService)
-	consultationHandler := consultation.NewHandler(consultationService)
+	consultationHandler := consultation.NewHandler(consultationService, auditLogService)
 	messageHandler := message.NewHandler(messageService, clientService)
 	contentHandler := content.NewHandler(contentService)
-	blogHandler := blog.NewHandler(blogService)
-	accountantHandler := accountant.NewHandler(accountantService)
+	blogHandler := blog.NewHandler(blogService, auditLogService)
+	accountantHandler := accountant.NewHandler(accountantService, auditLogService)
 	notificationHandler := notification.NewHandler(notificationService)
-	staffHandler := staff.NewHandler(staffService)
-
+	staffHandler := staff.NewHandler(staffService, auditLogService)
+	testimonialHandler := testimonial.NewHandler(testimonialService)
+	dashboardHandler := dashboard.NewHandler(
+		serviceRequestService,
+		consultationService,
+		clientService,
+		accountantService,
+	)
+	auditLogHandler := auditlog.NewHandler(auditLogService)
+	socialLinkHandler := sociallink.NewHandler(socialLinkService)
 	auth.RegisterRoutes(
 		mux,
 		options.Config.Server.APIBasePath,
@@ -230,11 +250,40 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		tokenManager,
 	)
 
+
 	staff.RegisterRoutes(
 	mux,
 	options.Config.Server.APIBasePath,
 	staffHandler,
 	tokenManager,
+	)
+
+	testimonial.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		testimonialHandler,
+		tokenManager,
+	)
+
+	dashboard.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		dashboardHandler,
+		tokenManager,
+	)
+
+	auditlog.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		auditLogHandler,
+		tokenManager,
+	)
+
+	sociallink.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		socialLinkHandler,
+		tokenManager,
 	)
 
 	return tokenManager
@@ -321,13 +370,29 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/notifications/read-all", notImplemented("notification read all route requires database connection"))
 		mux.HandleFunc(api+"/notifications/detail", notImplemented("notification detail route requires database connection"))
 
+		mux.HandleFunc(api+"/accountant/consultations", notImplemented("accountant consultations route requires database connection"))
+		mux.HandleFunc(api+"/accountant/consultations/detail", notImplemented("accountant consultation detail route requires database connection"))
+		mux.HandleFunc(api+"/accountant/consultations/status", notImplemented("accountant consultation status route requires database connection"))
+
 		mux.HandleFunc(api+"/staff", notImplemented("staff route requires database connection"))
 		mux.HandleFunc(api+"/staff/detail", notImplemented("staff detail route requires database connection"))
 		mux.HandleFunc(api+"/admin/staff", notImplemented("admin staff route requires database connection"))
 		mux.HandleFunc(api+"/admin/staff/detail", notImplemented("admin staff detail route requires database connection"))
 		mux.HandleFunc(api+"/admin/staff/status", notImplemented("admin staff status route requires database connection"))
 
+		mux.HandleFunc(api+"/testimonials", notImplemented("testimonials route requires database connection"))
+		mux.HandleFunc(api+"/admin/testimonials", notImplemented("admin testimonials route requires database connection"))
+		mux.HandleFunc(api+"/admin/testimonials/detail", notImplemented("admin testimonial detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/testimonials/status", notImplemented("admin testimonial status route requires database connection"))
 
+		mux.HandleFunc(api+"/admin/dashboard/stats", notImplemented("admin dashboard stats route requires database connection"))
+
+		mux.HandleFunc(api+"/admin/audit-log", notImplemented("admin audit log route requires database connection"))
+
+		mux.HandleFunc(api+"/social-links", notImplemented("social links route requires database connection"))
+		mux.HandleFunc(api+"/admin/social-links", notImplemented("admin social links route requires database connection"))
+		mux.HandleFunc(api+"/admin/social-links/detail", notImplemented("admin social link detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/social-links/status", notImplemented("admin social link status route requires database connection"))
 	}
 
 	mux.HandleFunc(api+"/admin", notImplemented("admin route is not implemented yet"))

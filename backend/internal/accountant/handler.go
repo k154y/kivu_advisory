@@ -6,19 +6,44 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
 )
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
+		service:     service,
+		auditLogger: auditLogger,
 	}
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "accountant",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 func (h *Handler) AdminAccountants(w http.ResponseWriter, r *http.Request) {
@@ -77,6 +102,13 @@ func (h *Handler) AdminAccountantStatus(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	statusLabel := "deactivated"
+	if request.IsActive {
+		statusLabel = "activated"
+	}
+
+	h.recordAudit(r, "accountant.status_updated", id, "Accountant account "+statusLabel)
+
 	response.OK(w, "accountant status updated successfully", updatedAccountant)
 }
 
@@ -125,8 +157,17 @@ func (h *Handler) listAdminAccountants(w http.ResponseWriter, r *http.Request) {
 			"page":        filter.Page,
 			"page_size":   filter.PageSize,
 			"total_items": totalItems,
+			"total_pages": totalPages(totalItems, filter.PageSize),
 		},
 	})
+}
+
+func totalPages(totalItems int, pageSize int) int {
+	if pageSize <= 0 || totalItems <= 0 {
+		return 0
+	}
+
+	return (totalItems + pageSize - 1) / pageSize
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) error {

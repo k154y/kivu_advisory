@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
+	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
 )
@@ -15,7 +17,30 @@ import (
 const maxServiceRequestBodyBytes = 1 << 20 // 1 MB
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "service",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 type CreateServiceRequest struct {
@@ -50,9 +75,10 @@ type SetServiceActiveRequest struct {
 	IsActive bool `json:"is_active"`
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
+		service:     service,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -162,6 +188,8 @@ func (h *Handler) CreateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.recordAudit(r, "service.created", createdService.ID, "Service created: "+createdService.Title)
+
 	response.Created(w, "service created successfully", createdService)
 }
 
@@ -210,6 +238,8 @@ func (h *Handler) UpdateService(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.recordAudit(r, "service.updated", serviceID, "Service updated: "+updatedService.Title)
+
 	response.OK(w, "service updated successfully", updatedService)
 }
 
@@ -236,6 +266,13 @@ func (h *Handler) SetServiceActive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	statusLabel := "deactivated"
+	if request.IsActive {
+		statusLabel = "activated"
+	}
+
+	h.recordAudit(r, "service.status_updated", serviceID, "Service "+statusLabel)
+
 	response.OK(w, "service status updated successfully", map[string]any{
 		"id":        serviceID,
 		"is_active": request.IsActive,
@@ -258,6 +295,8 @@ func (h *Handler) DeleteService(w http.ResponseWriter, r *http.Request) {
 		writeServiceHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "service.deleted", serviceID, "Service deleted")
 
 	response.OK(w, "service deleted successfully", map[string]any{
 		"id": serviceID,

@@ -14,7 +14,13 @@ import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 
-type ConsultationStatus = "pending" | "confirmed" | "completed" | "cancelled";
+type ConsultationStatus =
+  | "new"
+  | "contacted"
+  | "scheduled"
+  | "in_progress"
+  | "closed"
+  | "cancelled";
 
 type Consultation = {
   id: string;
@@ -31,7 +37,11 @@ type Consultation = {
   preferred_date?: string | null;
   preferred_time?: string;
   status: ConsultationStatus | string;
+  priority?: string;
+  assigned_to_user_id?: string;
+  handled_by_user_id?: string;
   admin_notes?: string;
+  follow_up_notes?: string;
   created_at: string;
   updated_at: string;
 };
@@ -41,9 +51,11 @@ type ConsultationListResponse = {
 };
 
 const STATUSES: ConsultationStatus[] = [
-  "pending",
-  "confirmed",
-  "completed",
+  "new",
+  "contacted",
+  "scheduled",
+  "in_progress",
+  "closed",
   "cancelled",
 ];
 
@@ -72,17 +84,25 @@ function formatDate(value?: string | null) {
 }
 
 function getStatusLabel(status: string) {
-  return status.replace("_", " ").replace(/\b\w/g, (letter) => {
+  return status.replace(/_/g, " ").replace(/\b\w/g, (letter) => {
     return letter.toUpperCase();
   });
 }
 
 function getStatusColor(status: string) {
-  if (status === "confirmed") {
+  if (status === "contacted") {
     return "bg-blue-50 text-blue-700";
   }
 
-  if (status === "completed") {
+  if (status === "scheduled") {
+    return "bg-purple-50 text-purple-700";
+  }
+
+  if (status === "in_progress") {
+    return "bg-indigo-50 text-indigo-700";
+  }
+
+  if (status === "closed") {
     return "bg-teal-50 text-teal";
   }
 
@@ -100,6 +120,14 @@ function getMeetingMethod(consultation: Consultation) {
     consultation.consultation_type ||
     "phone"
   );
+}
+
+function getSafeErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
 }
 
 export default function AdminConsultationsPage() {
@@ -123,8 +151,10 @@ export default function AdminConsultationsPage() {
       );
 
       setList(getConsultationItems(result.data));
-    } catch {
-      toast.error("Failed to load consultations.");
+    } catch (error) {
+      toast.error(
+        getSafeErrorMessage(error, "Failed to load consultations."),
+      );
     } finally {
       setLoading(false);
     }
@@ -135,22 +165,26 @@ export default function AdminConsultationsPage() {
   }, []);
 
   const handleStatus = async (id: string, status: ConsultationStatus) => {
-    setUpdating(id);
+  setUpdating(id);
 
-    try {
-      await api.patch(`/admin/consultations/status?id=${encodeURIComponent(id)}`, {
-        status,
-      });
+  try {
+    await api.patch(`/admin/consultations/status?id=${encodeURIComponent(id)}`, {
+      status,
+    });
 
-      toast.success("Status updated.");
-      await load();
-    } catch {
-      toast.error("Failed to update status.");
-    } finally {
-      setUpdating(null);
-    }
-  };
-
+    toast.success("Status updated.");
+    await load();
+  } catch (error) {
+    toast.error(
+      getSafeErrorMessage(
+        error,
+        "Database operation failed while updating consultation status.",
+      ),
+    );
+  } finally {
+    setUpdating(null);
+  }
+};
   return (
     <div className="max-w-6xl">
       <div className="mb-6 flex items-center justify-between">
@@ -191,8 +225,8 @@ export default function AdminConsultationsPage() {
 
       <div className="space-y-4">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-400">
-            Loading...
+          <div className="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-400">
+            Loading consultations...
           </div>
         ) : filteredList.length === 0 ? (
           <div className="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-400">
@@ -314,26 +348,28 @@ export default function AdminConsultationsPage() {
                       </div>
                     ) : null}
                   </div>
+                  <div className="flex shrink-0 flex-col gap-2 sm:w-44">
+                    <label className="text-xs font-semibold text-gray-500">
+                      Change status
+                    </label>
 
-                  <div className="flex shrink-0 flex-col gap-2 sm:w-40">
-                    {STATUSES.map((status) => (
-                      <button
-                        key={status}
-                        type="button"
-                        disabled={
-                          consultation.status === status ||
-                          updating === consultation.id
-                        }
-                        onClick={() => handleStatus(consultation.id, status)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-default disabled:opacity-40 ${
-                          consultation.status === status
-                            ? "cursor-default bg-navy text-white"
-                            : "border border-gray-200 text-gray-600 hover:border-navy hover:text-navy"
-                        }`}
-                      >
-                        {getStatusLabel(status)}
-                      </button>
-                    ))}
+                    <select
+                      value={consultation.status}
+                      disabled={updating === consultation.id}
+                      onChange={(event) =>
+                        handleStatus(
+                          consultation.id,
+                          event.target.value as ConsultationStatus,
+                        )
+                      }
+                      className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-teal/30 disabled:opacity-50"
+                    >
+                      {STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {getStatusLabel(status)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -344,3 +380,5 @@ export default function AdminConsultationsPage() {
     </div>
   );
 }
+
+export type { Consultation, ConsultationStatus };

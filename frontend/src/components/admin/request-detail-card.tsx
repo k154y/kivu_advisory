@@ -1,12 +1,13 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Mail, Phone, Save, User2, WalletCards } from "lucide-react";
+import { Mail, Pencil, Phone, Save, User2, WalletCards, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { DetailRow } from "@/components/common/detail-row";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,7 +22,10 @@ import {
   titleCase,
 } from "@/lib/format";
 import { getSafeErrorMessage } from "@/lib/portal";
-import type { ServiceRequestStatus } from "@/types/api";
+import type { ContactMethod, Priority, ServiceRequestStatus } from "@/types/api";
+
+const priorityOptions: Priority[] = ["low", "normal", "high", "urgent"];
+const contactMethodOptions: ContactMethod[] = ["email", "phone", "whatsapp"];
 
 export type AdminRequestDetail = {
   id: string;
@@ -65,6 +69,74 @@ export function RequestDetailCard({
   const [adminNotes, setAdminNotes] = useState(request.admin_notes || "");
   const [internalNotes, setInternalNotes] = useState(request.internal_notes || "");
   const [isSaving, setIsSaving] = useState(false);
+
+  const [isEditingDetails, setIsEditingDetails] = useState(false);
+  const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [detailsForm, setDetailsForm] = useState({
+    title: request.title,
+    description: request.description,
+    requester_name: request.requester_name || "",
+    requester_email: request.requester_email || "",
+    requester_phone: request.requester_phone || "",
+    requester_company: request.requester_company || "",
+    priority: request.priority,
+    preferred_contact_method: request.preferred_contact_method || "email",
+  });
+
+  const updateDetailsForm = <K extends keyof typeof detailsForm>(
+    key: K,
+    value: (typeof detailsForm)[K],
+  ) => {
+    setDetailsForm((current) => ({ ...current, [key]: value }));
+  };
+
+  const openEditDetails = () => {
+    setDetailsForm({
+      title: request.title,
+      description: request.description,
+      requester_name: request.requester_name || "",
+      requester_email: request.requester_email || "",
+      requester_phone: request.requester_phone || "",
+      requester_company: request.requester_company || "",
+      priority: request.priority,
+      preferred_contact_method: request.preferred_contact_method || "email",
+    });
+    setIsEditingDetails(true);
+  };
+
+  const handleDetailsSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingDetails(true);
+
+    try {
+      await api.put(endpoints.admin.serviceRequestDetail(request.id), {
+        requester_name: detailsForm.requester_name.trim() || undefined,
+        requester_email: detailsForm.requester_email.trim() || undefined,
+        requester_phone: detailsForm.requester_phone.trim() || undefined,
+        requester_company: detailsForm.requester_company.trim() || undefined,
+        title: detailsForm.title.trim(),
+        description: detailsForm.description.trim(),
+        priority: detailsForm.priority,
+        preferred_contact_method: detailsForm.preferred_contact_method,
+        admin_notes: request.admin_notes || undefined,
+        internal_notes: request.internal_notes || undefined,
+      });
+
+      onUpdated?.({
+        ...request,
+        ...detailsForm,
+        title: detailsForm.title.trim(),
+        description: detailsForm.description.trim(),
+      });
+
+      toast.success("Request details updated successfully.");
+      setIsEditingDetails(false);
+    } catch (error) {
+      toast.error(getSafeErrorMessage(error, "Unable to update request details."));
+    } finally {
+      setIsSavingDetails(false);
+    }
+  };
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -111,10 +183,105 @@ export function RequestDetailCard({
             <div className="flex flex-wrap items-center gap-2">
               <StatusBadge type="service-request" value={request.status} />
               <StatusBadge type="priority" value={request.priority} />
+              {!isEditingDetails ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={openEditDetails}
+                  leftIcon={<Pencil className="h-3.5 w-3.5" />}
+                >
+                  Edit details
+                </Button>
+              ) : null}
             </div>
           </div>
         </CardHeader>
         <CardContent className="grid gap-6 pt-6 lg:grid-cols-2">
+          {isEditingDetails ? (
+            <form
+              onSubmit={handleDetailsSubmit}
+              className="grid gap-4 lg:col-span-2 lg:grid-cols-2"
+            >
+              <Input
+                label="Title"
+                value={detailsForm.title}
+                onChange={(event) => updateDetailsForm("title", event.target.value)}
+              />
+              <Input
+                label="Requester name"
+                value={detailsForm.requester_name}
+                onChange={(event) =>
+                  updateDetailsForm("requester_name", event.target.value)
+                }
+              />
+              <Input
+                label="Requester email"
+                type="email"
+                value={detailsForm.requester_email}
+                onChange={(event) =>
+                  updateDetailsForm("requester_email", event.target.value)
+                }
+              />
+              <Input
+                label="Requester phone"
+                value={detailsForm.requester_phone}
+                onChange={(event) =>
+                  updateDetailsForm("requester_phone", event.target.value)
+                }
+              />
+              <Input
+                label="Requester company"
+                value={detailsForm.requester_company}
+                onChange={(event) =>
+                  updateDetailsForm("requester_company", event.target.value)
+                }
+              />
+              <Select
+                label="Priority"
+                value={detailsForm.priority}
+                onChange={(event) => updateDetailsForm("priority", event.target.value)}
+                options={priorityOptions.map((option) => ({
+                  label: titleCase(option),
+                  value: option,
+                }))}
+              />
+              <Select
+                label="Preferred contact method"
+                value={detailsForm.preferred_contact_method}
+                onChange={(event) =>
+                  updateDetailsForm("preferred_contact_method", event.target.value)
+                }
+                options={contactMethodOptions.map((option) => ({
+                  label: titleCase(option),
+                  value: option,
+                }))}
+              />
+              <div className="lg:col-span-2">
+                <Textarea
+                  label="Description"
+                  value={detailsForm.description}
+                  onChange={(event) =>
+                    updateDetailsForm("description", event.target.value)
+                  }
+                />
+              </div>
+              <div className="flex gap-3 lg:col-span-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditingDetails(false)}
+                  leftIcon={<X className="h-4 w-4" />}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" isLoading={isSavingDetails} leftIcon={<Save className="h-4 w-4" />}>
+                  Save details
+                </Button>
+              </div>
+            </form>
+          ) : (
+          <>
           <dl>
             <DetailRow
               label="Requester"
@@ -181,6 +348,8 @@ export function RequestDetailCard({
               {request.description}
             </div>
           </div>
+          </>
+          )}
         </CardContent>
       </Card>
 

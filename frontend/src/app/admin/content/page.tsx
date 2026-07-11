@@ -1,662 +1,642 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Edit3,
-  Eye,
+  Building2,
   FileText,
-  ImageIcon,
-  Plus,
-  RefreshCcw,
+  Home,
+  RefreshCw,
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 
-type ContentBlock = {
+type FieldType = "text" | "textarea";
+
+type ContentField = {
+  key: string;
+  label: string;
+  type: FieldType;
+  placeholder?: string;
+};
+
+type ContentSection = {
+  key: string;
+  contentKey: string;
+  label: string;
+  description: string;
+  icon: "home" | "about" | "file";
+  displayOrder: number;
+  fields: ContentField[];
+};
+
+type ContentItem = {
   id: string;
   content_key: string;
-  title?: string;
   slug?: string;
-  content_type: string;
-  body?: string;
+  title?: string;
   summary?: string;
-  meta_title?: string;
-  meta_description?: string;
+  body?: string;
   image_url?: string;
   button_label?: string;
   button_url?: string;
-  is_active: boolean;
-  display_order: number;
-  created_at: string;
-  updated_at: string;
+  content_type?: string;
+  is_active?: boolean;
+  display_order?: number;
+  created_at?: string;
+  updated_at?: string;
 };
 
-type ContentListResponse = {
-  items: ContentBlock[];
-};
+type ContentFormData = Record<string, string>;
+type ContentMap = Record<string, ContentFormData>;
+type ItemMap = Record<string, ContentItem>;
 
-type ContentFormState = {
-  content_key: string;
-  title: string;
-  slug: string;
-  content_type: string;
-  summary: string;
-  body: string;
-  image_url: string;
-  button_label: string;
-  button_url: string;
-  meta_title: string;
-  meta_description: string;
-  is_active: boolean;
-  display_order: number;
-};
-
-const emptyForm: ContentFormState = {
-  content_key: "",
-  title: "",
-  slug: "",
-  content_type: "section",
-  summary: "",
-  body: "",
-  image_url: "",
-  button_label: "",
-  button_url: "",
-  meta_title: "",
-  meta_description: "",
-  is_active: true,
-  display_order: 1,
-};
-
-const recommendedBlocks = [
+const SECTIONS: ContentSection[] = [
   {
-    key: "home_hero",
+    key: "homeHero",
+    contentKey: "home_hero",
     label: "Homepage Hero",
-    description: "Controls main homepage title, description, image, and button.",
+    description: "Main homepage headline, subtitle, image, and button.",
+    icon: "home",
+    displayOrder: 1,
+    fields: [
+      {
+        key: "title",
+        label: "Hero Title",
+        type: "text",
+        placeholder: "Accounting, Tax and Business Advisory Services You Can Trust",
+      },
+      {
+        key: "summary",
+        label: "Hero Subtitle",
+        type: "textarea",
+        placeholder:
+          "We help businesses stay compliant, organized, and financially informed.",
+      },
+      {
+        key: "image_url",
+        label: "Hero Image URL",
+        type: "text",
+        placeholder: "https://example.com/hero-image.jpg",
+      },
+      {
+        key: "button_label",
+        label: "Primary Button Text",
+        type: "text",
+        placeholder: "Request a Service",
+      },
+      {
+        key: "button_url",
+        label: "Primary Button URL",
+        type: "text",
+        placeholder: "/request-service",
+      },
+    ],
   },
   {
-    key: "home_contact_cta",
-    label: "Homepage Contact CTA",
-    description: "Controls the final call-to-action section on homepage.",
+    key: "aboutIntro",
+    contentKey: "about_intro",
+    label: "About Intro",
+    description: "Main title and introduction shown on the About page.",
+    icon: "about",
+    displayOrder: 2,
+    fields: [
+      {
+        key: "title",
+        label: "About Page Title",
+        type: "text",
+        placeholder:
+          "Professional accounting, tax, audit, and business advisory support.",
+      },
+      {
+        key: "summary",
+        label: "Intro Summary",
+        type: "textarea",
+        placeholder:
+          "Kivu Advisory supports businesses, institutions, entrepreneurs, and organizations...",
+      },
+      {
+        key: "body",
+        label: "Intro Body",
+        type: "textarea",
+        placeholder: "Write more about who Kivu Advisory is...",
+      },
+    ],
   },
   {
-    key: "about_page",
-    label: "About Page",
-    description: "Can be used later for editable about page content.",
+    key: "aboutMission",
+    contentKey: "about_mission",
+    label: "About Mission",
+    description: "Mission statement shown on the About page.",
+    icon: "file",
+    displayOrder: 3,
+    fields: [
+      {
+        key: "title",
+        label: "Mission Title",
+        type: "text",
+        placeholder: "Our Mission",
+      },
+      {
+        key: "body",
+        label: "Mission Text",
+        type: "textarea",
+        placeholder: "Write the mission statement...",
+      },
+    ],
   },
   {
-    key: "contact_page",
-    label: "Contact Page",
-    description: "Can be used later for editable contact page content.",
+    key: "aboutValues",
+    contentKey: "about_values",
+    label: "About Values",
+    description: "Comma-separated or line-separated values shown on About page.",
+    icon: "file",
+    displayOrder: 4,
+    fields: [
+      {
+        key: "title",
+        label: "Values Title",
+        type: "text",
+        placeholder: "What Clients Can Expect",
+      },
+      {
+        key: "body",
+        label: "Values",
+        type: "textarea",
+        placeholder:
+          "Confidential handling of client information, Clear accounting and tax support, Professional reporting and documentation",
+      },
+    ],
+  },
+  {
+    key: "contactIntro",
+    contentKey: "contact_intro",
+    label: "Contact Intro",
+    description: "Main title and introduction shown on the Contact page.",
+    icon: "file",
+    displayOrder: 20,
+    fields: [
+      {
+        key: "title",
+        label: "Contact Page Title",
+        type: "text",
+        placeholder: "Contact Us",
+      },
+      {
+        key: "summary",
+        label: "Hero Subtitle",
+        type: "textarea",
+        placeholder:
+          "We are ready to answer your questions and help you find the right service.",
+      },
+      {
+        key: "body",
+        label: "Contact Info Intro",
+        type: "textarea",
+        placeholder:
+          "You can reach us by phone, WhatsApp, or email. You can also visit our office during working hours.",
+      },
+    ],
+  },
+  {
+    key: "contactPhone",
+    contentKey: "contact_phone",
+    label: "Contact Phone",
+    description: "Phone number shown on the Contact page.",
+    icon: "file",
+    displayOrder: 21,
+    fields: [
+      {
+        key: "title",
+        label: "Label",
+        type: "text",
+        placeholder: "Phone",
+      },
+      {
+        key: "body",
+        label: "Phone Number",
+        type: "text",
+        placeholder: "0786196355",
+      },
+      {
+        key: "button_url",
+        label: "Phone Link",
+        type: "text",
+        placeholder: "tel:0786196355",
+      },
+    ],
+  },
+  {
+    key: "contactWhatsapp",
+    contentKey: "contact_whatsapp",
+    label: "Contact WhatsApp",
+    description: "WhatsApp contact shown on the Contact page.",
+    icon: "file",
+    displayOrder: 22,
+    fields: [
+      {
+        key: "title",
+        label: "Label",
+        type: "text",
+        placeholder: "WhatsApp",
+      },
+      {
+        key: "body",
+        label: "Display Text",
+        type: "text",
+        placeholder: "0786196355 — Click to message",
+      },
+      {
+        key: "button_url",
+        label: "WhatsApp Link",
+        type: "text",
+        placeholder: "https://wa.me/250786196355",
+      },
+    ],
+  },
+  {
+    key: "contactEmail",
+    contentKey: "contact_email",
+    label: "Contact Email",
+    description: "Email address shown on the Contact page.",
+    icon: "file",
+    displayOrder: 23,
+    fields: [
+      {
+        key: "title",
+        label: "Label",
+        type: "text",
+        placeholder: "Email",
+      },
+      {
+        key: "body",
+        label: "Email Address",
+        type: "text",
+        placeholder: "info@kivuadvisory.com",
+      },
+      {
+        key: "button_url",
+        label: "Email Link",
+        type: "text",
+        placeholder: "mailto:info@kivuadvisory.com",
+      },
+    ],
+  },
+  {
+    key: "contactLocation",
+    contentKey: "contact_location",
+    label: "Contact Location",
+    description: "Office location shown on the Contact page.",
+    icon: "file",
+    displayOrder: 24,
+    fields: [
+      {
+        key: "title",
+        label: "Label",
+        type: "text",
+        placeholder: "Office Location",
+      },
+      {
+        key: "body",
+        label: "Location",
+        type: "textarea",
+        placeholder: "Kigali, Rwanda",
+      },
+    ],
+  },
+  {
+    key: "contactHours",
+    contentKey: "contact_hours",
+    label: "Contact Hours",
+    description: "Working hours shown on the Contact page.",
+    icon: "file",
+    displayOrder: 25,
+    fields: [
+      {
+        key: "title",
+        label: "Label",
+        type: "text",
+        placeholder: "Working Hours",
+      },
+      {
+        key: "body",
+        label: "Working Hours",
+        type: "textarea",
+        placeholder:
+          "Monday – Friday: 8:00 AM – 6:00 PM\nSaturday: 9:00 AM – 1:00 PM\nClosed on Sundays and public holidays",
+      },
+    ],
+  },
+  {
+    key: "contactWhatsappBox",
+    contentKey: "contact_whatsapp_box",
+    label: "Contact WhatsApp Box",
+    description: "Highlighted WhatsApp call-to-action box on Contact page.",
+    icon: "file",
+    displayOrder: 26,
+    fields: [
+      {
+        key: "title",
+        label: "Box Title",
+        type: "text",
+        placeholder: "Prefer WhatsApp?",
+      },
+      {
+        key: "summary",
+        label: "Box Text",
+        type: "textarea",
+        placeholder:
+          "For quick responses, message us directly on WhatsApp. We usually respond within a few hours during working hours.",
+      },
+      {
+        key: "button_label",
+        label: "Button Text",
+        type: "text",
+        placeholder: "Message on WhatsApp",
+      },
+      {
+        key: "button_url",
+        label: "Button URL",
+        type: "text",
+        placeholder: "https://wa.me/250786196355",
+      },
+    ],
   },
 ];
 
-function getContentItems(data: ContentListResponse | ContentBlock[]) {
-  if (Array.isArray(data)) {
-    return data;
-  }
-
-  return data.items || [];
+function getSectionIcon(icon: ContentSection["icon"]) {
+  if (icon === "home") return Home;
+  if (icon === "about") return Building2;
+  return FileText;
 }
 
-function blockToForm(block: ContentBlock): ContentFormState {
+function getSafeErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
+function getContentItems(response: unknown): ContentItem[] {
+  if (Array.isArray(response)) return response as ContentItem[];
+
+  if (!response || typeof response !== "object") return [];
+
+  const objectResponse = response as {
+    items?: ContentItem[];
+    data?: ContentItem[] | { items?: ContentItem[] };
+  };
+
+  if (Array.isArray(objectResponse.items)) return objectResponse.items;
+  if (Array.isArray(objectResponse.data)) return objectResponse.data;
+
+  if (
+    objectResponse.data &&
+    !Array.isArray(objectResponse.data) &&
+    Array.isArray(objectResponse.data.items)
+  ) {
+    return objectResponse.data.items;
+  }
+
+  return [];
+}
+
+function itemToFormData(item: ContentItem): ContentFormData {
   return {
-    content_key: block.content_key || "",
-    title: block.title || "",
-    slug: block.slug || "",
-    content_type: block.content_type || "section",
-    summary: block.summary || "",
-    body: block.body || "",
-    image_url: block.image_url || "",
-    button_label: block.button_label || "",
-    button_url: block.button_url || "",
-    meta_title: block.meta_title || "",
-    meta_description: block.meta_description || "",
-    is_active: block.is_active,
-    display_order: block.display_order || 1,
+    title: item.title || "",
+    summary: item.summary || "",
+    body: item.body || "",
+    image_url: item.image_url || "",
+    button_label: item.button_label || "",
+    button_url: item.button_url || "",
   };
 }
 
-function buildPayload(form: ContentFormState) {
+function buildSlug(contentKey: string) {
+  return contentKey.replaceAll("_", "-");
+}
+
+function buildPayload(
+  section: ContentSection,
+  data: ContentFormData,
+): Record<string, unknown> {
   return {
-    content_key: form.content_key.trim(),
-    title: form.title.trim(),
-    slug: form.slug.trim(),
-    content_type: form.content_type.trim() || "section",
-    summary: form.summary.trim(),
-    body: form.body.trim(),
-    image_url: form.image_url.trim(),
-    button_label: form.button_label.trim(),
-    button_url: form.button_url.trim(),
-    meta_title: form.meta_title.trim(),
-    meta_description: form.meta_description.trim(),
-    is_active: form.is_active,
-    display_order: Number(form.display_order) || 1,
+    content_key: section.contentKey,
+    slug: buildSlug(section.contentKey),
+    title: data.title || "",
+    summary: data.summary || "",
+    body: data.body || "",
+    image_url: data.image_url || "",
+    button_label: data.button_label || "",
+    button_url: data.button_url || "",
+    content_type: "section",
+    is_active: true,
+    display_order: section.displayOrder,
   };
 }
 
 export default function AdminContentPage() {
-  const [blocks, setBlocks] = useState<ContentBlock[]>([]);
-  const [selectedBlock, setSelectedBlock] = useState<ContentBlock | null>(null);
-  const [form, setForm] = useState<ContentFormState>(emptyForm);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
+  const [activeSectionKey, setActiveSectionKey] = useState(SECTIONS[0].key);
+  const [contentMap, setContentMap] = useState<ContentMap>({});
+  const [itemMap, setItemMap] = useState<ItemMap>({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  const sortedBlocks = useMemo(() => {
-    return [...blocks].sort((a, b) => {
-      if (a.display_order !== b.display_order) {
-        return a.display_order - b.display_order;
-      }
+  const section = useMemo(() => {
+    return (
+      SECTIONS.find((item) => item.key === activeSectionKey) || SECTIONS[0]
+    );
+  }, [activeSectionKey]);
 
-      return a.content_key.localeCompare(b.content_key);
-    });
-  }, [blocks]);
+  const sectionData = contentMap[section.key] || {};
 
-  const loadContentBlocks = async () => {
-    setIsLoading(true);
+  const load = async () => {
+    setLoading(true);
 
     try {
-      const result = await api.get<ContentListResponse | ContentBlock[]>(
-        "/admin/content?page_size=100",
+      const result = await api.get<unknown>(
+        "/admin/content?content_type=section&page_size=200",
       );
 
-      setBlocks(getContentItems(result.data));
+      const items = getContentItems(result.data);
+
+      const nextContentMap: ContentMap = {};
+      const nextItemMap: ItemMap = {};
+
+      SECTIONS.forEach((contentSection) => {
+        const item = items.find(
+          (contentItem) =>
+            contentItem.content_key === contentSection.contentKey,
+        );
+
+        if (item) {
+          nextContentMap[contentSection.key] = itemToFormData(item);
+          nextItemMap[contentSection.key] = item;
+        }
+      });
+
+      setContentMap(nextContentMap);
+      setItemMap(nextItemMap);
     } catch (error) {
-      toast.error("Failed to load content blocks.");
+      toast.error(
+        getSafeErrorMessage(error, "Failed to load website content."),
+      );
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    void loadContentBlocks();
+    void load();
   }, []);
 
-  const updateForm = <K extends keyof ContentFormState>(
-    field: K,
-    value: ContentFormState[K],
-  ) => {
-    setForm((current) => ({
+  const updateField = (key: string, value: string) => {
+    setContentMap((current) => ({
       ...current,
-      [field]: value,
+      [section.key]: {
+        ...(current[section.key] || {}),
+        [key]: value,
+      },
     }));
   };
 
-  const startCreate = (contentKey?: string) => {
-    setSelectedBlock(null);
-    setForm({
-      ...emptyForm,
-      content_key: contentKey || "",
-      title:
-        recommendedBlocks.find((block) => block.key === contentKey)?.label || "",
-    });
-  };
-
-  const startEdit = (block: ContentBlock) => {
-    setSelectedBlock(block);
-    setForm(blockToForm(block));
-  };
-
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    if (!form.content_key.trim()) {
-      toast.error("Content key is required.");
-      return;
-    }
-
-    if (!form.title.trim()) {
-      toast.error("Title is required.");
-      return;
-    }
-
-    setIsSaving(true);
+  const handleSave = async () => {
+    setSaving(true);
 
     try {
-      const payload = buildPayload(form);
+      const existingItem = itemMap[section.key];
+      const payload = buildPayload(section, sectionData);
 
-      if (selectedBlock) {
+      if (existingItem?.id) {
         await api.put(
-          `/admin/content/detail?id=${encodeURIComponent(selectedBlock.id)}`,
+          `/admin/content/detail?id=${encodeURIComponent(existingItem.id)}`,
           payload,
         );
-
-        toast.success("Content block updated.");
       } else {
         await api.post("/admin/content", payload);
-        toast.success("Content block created.");
       }
 
-      setSelectedBlock(null);
-      setForm(emptyForm);
-      await loadContentBlocks();
+      toast.success(`${section.label} updated successfully.`);
+      await load();
     } catch (error) {
       toast.error(
-        selectedBlock
-          ? "Failed to update content block."
-          : "Failed to create content block.",
+        getSafeErrorMessage(error, "Failed to save website content."),
       );
     } finally {
-      setIsSaving(false);
+      setSaving(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-col gap-4 rounded-2xl bg-navy p-6 text-white md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-gold">
-            Website Content
-          </p>
-
-          <h1 className="text-2xl font-bold">Manage Website Content</h1>
-
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/70">
-            Create and edit content blocks used by the public website, such as
-            homepage hero text, homepage CTA, page sections, images, and
-            buttons.
-          </p>
-        </div>
-
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => void loadContentBlocks()}
-            className="inline-flex items-center gap-2 rounded-lg border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10"
-          >
-            <RefreshCcw size={16} />
-            Refresh
-          </button>
-
-          <button
-            type="button"
-            onClick={() => startCreate()}
-            className="inline-flex items-center gap-2 rounded-lg bg-gold px-4 py-2.5 text-sm font-bold text-navy hover:bg-gold-600"
-          >
-            <Plus size={16} />
-            New Block
-          </button>
-        </div>
+    <div className="max-w-5xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-navy">Website Content</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Edit public website content without touching code.
+        </p>
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-[380px_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-navy">
-              <FileText size={18} />
-              Existing Blocks
-            </h2>
+      <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <div className="h-fit rounded-xl border border-gray-100 bg-white p-2">
+          {SECTIONS.map((item) => {
+            const Icon = getSectionIcon(item.icon);
+            const active = activeSectionKey === item.key;
 
-            {isLoading ? (
-              <p className="text-sm text-gray-500">Loading content blocks...</p>
-            ) : sortedBlocks.length > 0 ? (
-              <div className="space-y-3">
-                {sortedBlocks.map((block) => (
-                  <button
-                    key={block.id}
-                    type="button"
-                    onClick={() => startEdit(block)}
-                    className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                      selectedBlock?.id === block.id
-                        ? "border-teal bg-teal-50"
-                        : "border-gray-100 hover:border-navy/30 hover:bg-gray-50"
-                    }`}
-                  >
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <p className="font-semibold text-navy">
-                        {block.title || block.content_key}
-                      </p>
-
-                      <span
-                        className={`rounded-full px-2 py-1 text-xs font-semibold ${
-                          block.is_active
-                            ? "bg-teal-50 text-teal"
-                            : "bg-red-50 text-red-600"
-                        }`}
-                      >
-                        {block.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      {block.content_key}
-                    </p>
-
-                    {block.summary ? (
-                      <p className="line-clamp-2 text-sm text-gray-600">
-                        {block.summary}
-                      </p>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm leading-relaxed text-gray-500">
-                No content blocks yet. Create your first block using one of the
-                recommended keys below.
-              </p>
-            )}
-          </section>
-
-          <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
-            <h2 className="mb-4 text-lg font-bold text-navy">
-              Recommended Blocks
-            </h2>
-
-            <div className="space-y-3">
-              {recommendedBlocks.map((block) => {
-                const exists = blocks.some(
-                  (item) => item.content_key === block.key,
-                );
-
-                return (
-                  <button
-                    key={block.key}
-                    type="button"
-                    onClick={() => startCreate(block.key)}
-                    disabled={exists}
-                    className="w-full rounded-xl border border-gray-100 p-4 text-left transition-colors hover:border-navy/30 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <div className="mb-1 flex items-center justify-between gap-3">
-                      <p className="font-semibold text-navy">{block.label}</p>
-
-                      {exists ? (
-                        <span className="rounded-full bg-teal-50 px-2 py-1 text-xs font-semibold text-teal">
-                          Created
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-gray-50 px-2 py-1 text-xs font-semibold text-gray-500">
-                          Add
-                        </span>
-                      )}
-                    </div>
-
-                    <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-400">
-                      {block.key}
-                    </p>
-
-                    <p className="text-sm leading-relaxed text-gray-600">
-                      {block.description}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
+            return (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setActiveSectionKey(item.key)}
+                className={`mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-navy text-white"
+                    : "text-gray-600 hover:bg-lightgray hover:text-navy"
+                }`}
+              >
+                <Icon size={16} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
         </div>
 
-        <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-          <div className="mb-6 flex items-center justify-between gap-4">
+        <div className="rounded-xl border border-gray-100 bg-white p-6">
+          <div className="mb-6 flex items-start justify-between gap-4">
             <div>
-              <h2 className="flex items-center gap-2 text-xl font-bold text-navy">
-                <Edit3 size={20} />
-                {selectedBlock ? "Edit Content Block" : "Create Content Block"}
-              </h2>
-
+              <h2 className="text-lg font-bold text-navy">{section.label}</h2>
               <p className="mt-1 text-sm text-gray-500">
-                Use clear keys such as{" "}
-                <span className="font-semibold text-navy">home_hero</span> or{" "}
-                <span className="font-semibold text-navy">
-                  home_contact_cta
-                </span>
-                .
+                {section.description}
               </p>
-            </div>
-
-            {selectedBlock ? (
-              <button
-                type="button"
-                onClick={() => startCreate()}
-                className="rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-              >
-                Cancel Edit
-              </button>
-            ) : null}
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid gap-5 md:grid-cols-2">
-              <TextInput
-                label="Content Key"
-                value={form.content_key}
-                onChange={(value) => updateForm("content_key", value)}
-                placeholder="home_hero"
-                required
-              />
-
-              <TextInput
-                label="Content Type"
-                value={form.content_type}
-                onChange={(value) => updateForm("content_type", value)}
-                placeholder="section"
-                required
-              />
-
-              <TextInput
-                label="Title"
-                value={form.title}
-                onChange={(value) => updateForm("title", value)}
-                placeholder="Accounting, Tax and Business Advisory..."
-                required
-              />
-
-              <TextInput
-                label="Slug"
-                value={form.slug}
-                onChange={(value) => updateForm("slug", value)}
-                placeholder="home-hero"
-              />
-            </div>
-
-            <TextArea
-              label="Summary / Short Description"
-              value={form.summary}
-              onChange={(value) => updateForm("summary", value)}
-              placeholder="Short text displayed in the website section."
-              rows={3}
-            />
-
-            <TextArea
-              label="Body / Full Content"
-              value={form.body}
-              onChange={(value) => updateForm("body", value)}
-              placeholder="Longer content for the website section."
-              rows={6}
-            />
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <TextInput
-                label="Image URL"
-                value={form.image_url}
-                onChange={(value) => updateForm("image_url", value)}
-                placeholder="https://..."
-                icon={<ImageIcon size={16} />}
-              />
-
-              <TextInput
-                label="Display Order"
-                type="number"
-                value={String(form.display_order)}
-                onChange={(value) =>
-                  updateForm("display_order", Number(value) || 1)
-                }
-                placeholder="1"
-              />
-
-              <TextInput
-                label="Button Label"
-                value={form.button_label}
-                onChange={(value) => updateForm("button_label", value)}
-                placeholder="Request a Service"
-              />
-
-              <TextInput
-                label="Button URL"
-                value={form.button_url}
-                onChange={(value) => updateForm("button_url", value)}
-                placeholder="/request-service"
-              />
-            </div>
-
-            <div className="grid gap-5 md:grid-cols-2">
-              <TextInput
-                label="Meta Title"
-                value={form.meta_title}
-                onChange={(value) => updateForm("meta_title", value)}
-                placeholder="SEO title"
-              />
-
-              <TextInput
-                label="Meta Description"
-                value={form.meta_description}
-                onChange={(value) => updateForm("meta_description", value)}
-                placeholder="SEO description"
-              />
-            </div>
-
-            <label className="flex items-center gap-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
-              <input
-                type="checkbox"
-                checked={form.is_active}
-                onChange={(event) =>
-                  updateForm("is_active", event.target.checked)
-                }
-                className="h-4 w-4 rounded border-gray-300 text-teal focus:ring-teal"
-              />
-
-              <span>
-                <span className="block text-sm font-semibold text-navy">
-                  Active on website
-                </span>
-                <span className="block text-xs text-gray-500">
-                  Inactive blocks will not be used by the public website.
-                </span>
-              </span>
-            </label>
-
-            <div className="rounded-xl border border-gray-100 bg-lightgray p-5">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-navy">
-                <Eye size={16} />
-                Quick Preview
-              </h3>
-
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-teal">
-                {form.content_key || "content_key"}
+              <p className="mt-1 text-xs text-gray-400">
+                Content key: {section.contentKey}
               </p>
-
-              <h4 className="mb-2 text-xl font-bold text-navy">
-                {form.title || "Content title preview"}
-              </h4>
-
-              <p className="text-sm leading-relaxed text-gray-600">
-                {form.summary ||
-                  form.body ||
-                  "Summary or body preview will appear here."}
-              </p>
-
-              {form.button_label ? (
-                <p className="mt-4 inline-flex rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white">
-                  {form.button_label}
-                </p>
-              ) : null}
             </div>
 
             <button
-              type="submit"
-              disabled={isSaving}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-navy px-5 py-3 text-sm font-bold text-white hover:bg-navy-700 disabled:opacity-60 md:w-auto"
+              type="button"
+              onClick={() => void load()}
+              className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-lightgray hover:text-navy"
+              title="Refresh content"
             >
-              <Save size={16} />
-              {isSaving
-                ? "Saving..."
-                : selectedBlock
-                  ? "Update Content Block"
-                  : "Create Content Block"}
+              <RefreshCw size={16} />
             </button>
-          </form>
-        </section>
+          </div>
+
+          {loading ? (
+            <div className="space-y-5">
+              {section.fields.map((field) => (
+                <div key={field.key} className="animate-pulse">
+                  <div className="mb-2 h-4 w-40 rounded bg-gray-200" />
+                  <div className="h-11 rounded-lg bg-gray-100" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {section.fields.map((field) => (
+                <div key={field.key}>
+                  <label className="mb-1.5 block text-sm font-medium text-charcoal">
+                    {field.label}
+                  </label>
+
+                  {field.type === "textarea" ? (
+                    <textarea
+                      rows={5}
+                      value={sectionData[field.key] || ""}
+                      onChange={(event) =>
+                        updateField(field.key, event.target.value)
+                      }
+                      placeholder={field.placeholder}
+                      className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/30"
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={sectionData[field.key] || ""}
+                      onChange={(event) =>
+                        updateField(field.key, event.target.value)
+                      }
+                      placeholder={field.placeholder}
+                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/30"
+                    />
+                  )}
+                </div>
+              ))}
+
+              <div className="border-t border-gray-100 pt-5">
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="inline-flex items-center gap-2 rounded-lg bg-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-700 disabled:opacity-60"
+                >
+                  <Save size={15} />
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
-  );
-}
-
-type TextInputProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-  required?: boolean;
-  icon?: React.ReactNode;
-};
-
-function TextInput({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  required,
-  icon,
-}: TextInputProps) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-navy">
-        {label}
-        {required ? <span className="text-red-500"> *</span> : null}
-      </span>
-
-      <div className="relative">
-        {icon ? (
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-            {icon}
-          </span>
-        ) : null}
-
-        <input
-          type={type}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder={placeholder}
-          required={required}
-          className={`w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20 ${
-            icon ? "pl-10" : ""
-          }`}
-        />
-      </div>
-    </label>
-  );
-}
-
-type TextAreaProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  rows?: number;
-};
-
-function TextArea({
-  label,
-  value,
-  onChange,
-  placeholder,
-  rows = 4,
-}: TextAreaProps) {
-  return (
-    <label className="block">
-      <span className="mb-1.5 block text-sm font-semibold text-navy">
-        {label}
-      </span>
-
-      <textarea
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full resize-y rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/20"
-      />
-    </label>
   );
 }

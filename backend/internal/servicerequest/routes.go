@@ -18,7 +18,7 @@ func RegisterRoutes(
 	}
 
 	if handler == nil {
-		handler = NewHandler(nil, nil)
+		handler = NewHandler(nil, nil, nil)
 	}
 
 	api := cleanRoutePrefix(apiBasePath)

@@ -46,6 +46,7 @@ type Repository interface {
 	Update(ctx context.Context, id string, input UpdateServiceRequestInput) (*ServiceRequest, error)
 	UpdateStatus(ctx context.Context, id string, input UpdateStatusInput) (*ServiceRequest, error)
 	Delete(ctx context.Context, id string) error
+	CountByStatus(ctx context.Context) (map[string]int, error)
 }
 
 type PostgresRepository struct {
@@ -389,6 +390,41 @@ func (r *PostgresRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (r *PostgresRepository) CountByStatus(ctx context.Context) (map[string]int, error) {
+	if r == nil || r.pool == nil {
+		return nil, apperrors.Internal("service request repository is not initialized")
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT status, COUNT(*)
+		FROM service_requests
+		GROUP BY status
+	`)
+	if err != nil {
+		return nil, apperrors.InternalWrap(err, "failed to count service requests by status")
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+
+	for rows.Next() {
+		var status string
+		var count int
+
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, apperrors.InternalWrap(err, "failed to read service request status counts")
+		}
+
+		counts[status] = count
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, apperrors.InternalWrap(err, "failed to read service request status counts")
+	}
+
+	return counts, nil
 }
 
 type rowScanner interface {

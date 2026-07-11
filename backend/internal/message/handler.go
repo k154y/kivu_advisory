@@ -124,6 +124,7 @@ func (h *Handler) listMessages(w http.ResponseWriter, r *http.Request) {
 			"page":        filter.Page,
 			"page_size":   filter.PageSize,
 			"total_items": totalItems,
+			"total_pages": totalPages(totalItems, filter.PageSize),
 		},
 	})
 }
@@ -257,6 +258,14 @@ func parsePositiveInt(value string, fallback int) int {
 	}
 
 	return parsedValue
+}
+
+func totalPages(totalItems int, pageSize int) int {
+	if pageSize <= 0 || totalItems <= 0 {
+		return 0
+	}
+
+	return (totalItems + pageSize - 1) / pageSize
 }
 
 func parseBool(value string) bool {

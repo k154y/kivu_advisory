@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"log"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -47,6 +48,7 @@ type Repository interface {
 	Update(ctx context.Context, id string, input UpdateConsultationInput) (*Consultation, error)
 	UpdateStatus(ctx context.Context, id string, input UpdateStatusInput) (*Consultation, error)
 	Delete(ctx context.Context, id string) error
+	CountByStatus(ctx context.Context) (map[string]int, error)
 }
 
 type PostgresRepository struct {
@@ -317,8 +319,6 @@ func (r *PostgresRepository) UpdateStatus(ctx context.Context, id string, input 
 	}
 
 	input.Status = NormalizeStatus(input.Status)
-	input.AssignedToUserID = strings.TrimSpace(input.AssignedToUserID)
-	input.HandledByUserID = strings.TrimSpace(input.HandledByUserID)
 	input.AdminNotes = strings.TrimSpace(input.AdminNotes)
 	input.FollowUpNotes = strings.TrimSpace(input.FollowUpNotes)
 
@@ -326,46 +326,42 @@ func (r *PostgresRepository) UpdateStatus(ctx context.Context, id string, input 
 		return nil, apperrors.Validation(validationErrors)
 	}
 
-	query := fmt.Sprintf(`
-		UPDATE consultations
-		SET
-			status = $1,
-			assigned_to_user_id = COALESCE(NULLIF($2, ''), assigned_to_user_id),
-			handled_by_user_id = COALESCE(NULLIF($3, ''), handled_by_user_id),
-			admin_notes = COALESCE(NULLIF($4, ''), admin_notes),
-			follow_up_notes = COALESCE(NULLIF($5, ''), follow_up_notes),
-			contacted_at = CASE
-				WHEN $1 IN ('contacted', 'scheduled', 'in_progress', 'closed') AND contacted_at IS NULL
-					THEN NOW()
-				ELSE contacted_at
-			END,
-			closed_at = CASE
-				WHEN $1 IN ('closed', 'cancelled')
-					THEN COALESCE(closed_at, NOW())
-				ELSE NULL
-			END,
-			updated_at = NOW()
-		WHERE id = $6
-		RETURNING %s
-	`, consultationSelectColumns)
-
-	updatedConsultation, err := scanConsultation(r.pool.QueryRow(
-		ctx,
-		query,
+	commandTag, err := r.pool.Exec(
+	ctx,
+	`
+	UPDATE consultations
+	SET
+		status = $1::varchar,
+		admin_notes = COALESCE(NULLIF($2::text, ''), admin_notes),
+		follow_up_notes = COALESCE(NULLIF($3::text, ''), follow_up_notes),
+		contacted_at = CASE
+			WHEN $1::varchar IN ('contacted', 'scheduled', 'in_progress', 'closed') AND contacted_at IS NULL
+				THEN NOW()
+			ELSE contacted_at
+		END,
+		closed_at = CASE
+			WHEN $1::varchar IN ('closed', 'cancelled')
+				THEN COALESCE(closed_at, NOW())
+			ELSE NULL
+		END,
+		updated_at = NOW()
+	WHERE id = $4
+	`,
 		input.Status,
-		input.AssignedToUserID,
-		input.HandledByUserID,
 		input.AdminNotes,
 		input.FollowUpNotes,
 		id,
-	))
+	)
 	if err != nil {
 		return nil, mapPostgresError(err)
 	}
 
-	return updatedConsultation, nil
-}
+	if commandTag.RowsAffected() == 0 {
+		return nil, apperrors.NotFound("consultation not found")
+	}
 
+	return r.FindByID(ctx, id)
+}
 func (r *PostgresRepository) Delete(ctx context.Context, id string) error {
 	if r == nil || r.pool == nil {
 		return apperrors.Internal("consultation repository is not initialized")
@@ -389,6 +385,41 @@ func (r *PostgresRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (r *PostgresRepository) CountByStatus(ctx context.Context) (map[string]int, error) {
+	if r == nil || r.pool == nil {
+		return nil, apperrors.Internal("consultation repository is not initialized")
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT status, COUNT(*)
+		FROM consultations
+		GROUP BY status
+	`)
+	if err != nil {
+		return nil, apperrors.InternalWrap(err, "failed to count consultations by status")
+	}
+	defer rows.Close()
+
+	counts := make(map[string]int)
+
+	for rows.Next() {
+		var status string
+		var count int
+
+		if err := rows.Scan(&status, &count); err != nil {
+			return nil, apperrors.InternalWrap(err, "failed to read consultation status counts")
+		}
+
+		counts[status] = count
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, apperrors.InternalWrap(err, "failed to read consultation status counts")
+	}
+
+	return counts, nil
 }
 
 type rowScanner interface {
@@ -475,6 +506,16 @@ func mapPostgresError(err error) error {
 
 	var pgErr *pgconn.PgError
 	if stderrors.As(err, &pgErr) {
+		log.Printf(
+			"consultation postgres error: code=%s message=%s detail=%s constraint=%s table=%s column=%s",
+			pgErr.Code,
+			pgErr.Message,
+			pgErr.Detail,
+			pgErr.ConstraintName,
+			pgErr.TableName,
+			pgErr.ColumnName,
+		)
+
 		switch pgErr.Code {
 		case "23503":
 			return apperrors.Conflict("related assigned or handled user does not exist")
@@ -484,6 +525,8 @@ func mapPostgresError(err error) error {
 			return apperrors.InvalidInput("invalid consultation data")
 		}
 	}
+
+	log.Printf("consultation database error: %T: %v", err, err)
 
 	return apperrors.InternalWrap(err, "database operation failed")
 }

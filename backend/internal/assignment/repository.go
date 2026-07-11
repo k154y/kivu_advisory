@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -401,6 +402,16 @@ func mapPostgresError(err error) error {
 
 	var pgErr *pgconn.PgError
 	if stderrors.As(err, &pgErr) {
+		log.Printf(
+			"assignment postgres error: code=%s message=%s detail=%s constraint=%s table=%s column=%s",
+			pgErr.Code,
+			pgErr.Message,
+			pgErr.Detail,
+			pgErr.ConstraintName,
+			pgErr.TableName,
+			pgErr.ColumnName,
+		)
+
 		switch pgErr.Code {
 		case "23503":
 			return apperrors.Conflict("related service request, accountant, or admin user does not exist")
@@ -408,8 +419,12 @@ func mapPostgresError(err error) error {
 			return apperrors.Conflict("this service request is already assigned to this accountant")
 		case "23514":
 			return apperrors.InvalidInput("invalid assignment data")
+		case "23502":
+			return apperrors.InvalidInput("required assignment field is missing")
 		}
 	}
+
+	log.Printf("assignment database error: %T: %v", err, err)
 
 	return apperrors.InternalWrap(err, "database operation failed")
 }

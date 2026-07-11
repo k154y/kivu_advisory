@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import {
   ArrowRight,
   CheckCircle,
@@ -9,13 +12,20 @@ import {
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/layout/public-layout";
+import {
+  getContentText,
+  getSectionContentBlocks,
+} from "@/lib/website-content";
 
-const values = [
-  "Confidential handling of client information",
-  "Clear accounting and tax support",
-  "Professional reporting and documentation",
-  "Practical advisory for business decisions",
-];
+const fallbackAbout = {
+  title: "Professional accounting, tax, audit, and business advisory support.",
+  intro:
+    "Kivu Advisory supports businesses, institutions, entrepreneurs, and organizations with reliable financial services, practical advice, and organized client communication.",
+  mission:
+    "Through the client portal, clients can submit service requests, upload documents, exchange messages, and follow progress in a structured and professional way.",
+  values:
+    "Confidential handling of client information, Clear accounting and tax support, Professional reporting and documentation, Practical advisory for business decisions",
+};
 
 const focusAreas = [
   {
@@ -40,7 +50,70 @@ const focusAreas = [
   },
 ];
 
+function splitValues(value: string) {
+  return value
+    .split(/,|\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default function AboutPage() {
+  const [title, setTitle] = useState(fallbackAbout.title);
+  const [intro, setIntro] = useState(fallbackAbout.intro);
+  const [mission, setMission] = useState(fallbackAbout.mission);
+  const [values, setValues] = useState<string[]>(
+    splitValues(fallbackAbout.values),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAboutContent = async () => {
+      const items = await getSectionContentBlocks();
+
+      if (cancelled) return;
+
+      const aboutIntro = items.find(
+        (item) => item.content_key === "about_intro",
+      );
+
+      const aboutValues = items.find(
+        (item) => item.content_key === "about_values",
+      );
+
+      const aboutMission = items.find(
+        (item) => item.content_key === "about_mission",
+      );
+
+      if (aboutIntro) {
+        setTitle(aboutIntro.title || fallbackAbout.title);
+        setIntro(
+          aboutIntro.summary ||
+            aboutIntro.body ||
+            fallbackAbout.intro,
+        );
+      }
+
+      if (aboutMission) {
+        setMission(getContentText(aboutMission) || fallbackAbout.mission);
+      }
+
+      if (aboutValues) {
+        const loadedValues = splitValues(getContentText(aboutValues));
+
+        if (loadedValues.length > 0) {
+          setValues(loadedValues);
+        }
+      }
+    };
+
+    void loadAboutContent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <PublicLayout>
       <section className="bg-navy py-20 text-white">
@@ -50,13 +123,11 @@ export default function AboutPage() {
           </p>
 
           <h1 className="max-w-4xl text-4xl font-bold leading-tight sm:text-5xl">
-            Professional accounting, tax, audit, and business advisory support.
+            {title}
           </h1>
 
           <p className="mt-6 max-w-3xl leading-relaxed text-white/75">
-            Kivu Advisory supports businesses, institutions, entrepreneurs, and
-            organizations with reliable financial services, practical advice,
-            and organized client communication.
+            {intro}
           </p>
         </div>
       </section>
@@ -69,22 +140,12 @@ export default function AboutPage() {
             </p>
 
             <h2 className="mb-5 text-3xl font-bold text-navy sm:text-4xl">
-              We help clients stay organized, compliant, and financially
-              informed.
+              {title}
             </h2>
 
-            <p className="mb-6 leading-relaxed text-gray-600">
-              Our work focuses on practical accounting, tax, payroll, audit
-              preparation, compliance, and advisory services. We help clients
-              manage records properly, understand financial information, and
-              make better business decisions.
-            </p>
+            <p className="mb-6 leading-relaxed text-gray-600">{intro}</p>
 
-            <p className="leading-relaxed text-gray-600">
-              Through the client portal, clients can submit service requests,
-              upload documents, exchange messages, and follow progress in a
-              structured and professional way.
-            </p>
+            <p className="leading-relaxed text-gray-600">{mission}</p>
           </div>
 
           <div className="rounded-2xl bg-lightgray p-6">

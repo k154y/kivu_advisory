@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	clientpkg "github.com/kyves/kivu-advisory/backend/internal/client"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
@@ -25,8 +26,31 @@ type ClientProfileService interface {
 }
 
 type Handler struct {
-	service *Service
-	clients ClientProfileService
+	service     *Service
+	clients     ClientProfileService
+	auditLogger *auditlog.Service
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "service_request",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 type CreateServiceRequestRequest struct {
@@ -64,10 +88,11 @@ type UpdateServiceRequestStatusRequest struct {
 	InternalNotes string `json:"internal_notes"`
 }
 
-func NewHandler(service *Service, clients ClientProfileService) *Handler {
+func NewHandler(service *Service, clients ClientProfileService, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
-		clients: clients,
+		service:     service,
+		clients:     clients,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -363,6 +388,8 @@ func (h *Handler) UpdateRequestStatus(w http.ResponseWriter, r *http.Request) {
 		writeServiceRequestHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "service_request.status_updated", requestID, "Service request status changed to "+request.Status)
 
 	response.OK(w, "service request status updated successfully", updatedRequest)
 }

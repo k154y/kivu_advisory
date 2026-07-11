@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
@@ -15,7 +16,30 @@ import (
 const maxBlogRequestBodyBytes = 1 << 20
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "blog",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 type createPostRequest struct {
@@ -38,8 +62,8 @@ type updateStatusRequest struct {
 	Status string `json:"status"`
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
+	return &Handler{service: service, auditLogger: auditLogger}
 }
 
 func (h *Handler) PublicPosts(w http.ResponseWriter, r *http.Request) {
@@ -142,6 +166,8 @@ func (h *Handler) AdminPostStatus(w http.ResponseWriter, r *http.Request) {
 		writeHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "blog.status_updated", id, "Blog post status changed to "+request.Status)
 
 	response.OK(w, "blog status updated successfully", item)
 }

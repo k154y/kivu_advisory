@@ -1,15 +1,10 @@
-import { api } from "@/lib/api";
-
 export type WebsiteContentBlock = {
-  id?: string;
-  content_key?: string;
+  id: string;
+  content_key: string;
   title?: string;
-  slug?: string;
   content_type?: string;
-  body?: string;
   summary?: string;
-  meta_title?: string;
-  meta_description?: string;
+  body?: string;
   image_url?: string;
   button_label?: string;
   button_url?: string;
@@ -19,88 +14,62 @@ export type WebsiteContentBlock = {
   updated_at?: string;
 };
 
-type ContentListResponse = {
+type ContentResponse = {
+  success?: boolean;
+  data?: {
+    items?: WebsiteContentBlock[];
+  };
   items?: WebsiteContentBlock[];
 };
 
-function isWebsiteContentBlock(value: unknown): value is WebsiteContentBlock {
-  if (!value || typeof value !== "object") {
-    return false;
+const apiBaseUrl = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  "http://localhost:8080/api/v1"
+).replace(/\/$/, "");
+
+function getItems(response: ContentResponse): WebsiteContentBlock[] {
+  if (Array.isArray(response.items)) {
+    return response.items;
   }
 
-  return true;
+  if (Array.isArray(response.data?.items)) {
+    return response.data.items;
+  }
+
+  return [];
 }
 
-function isContentListResponse(value: unknown): value is ContentListResponse {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  return "items" in value;
+export function getContentText(block?: WebsiteContentBlock | null) {
+  return block?.body || block?.summary || block?.title || "";
 }
 
-function getContentFromResponse(
-  data: WebsiteContentBlock | WebsiteContentBlock[] | ContentListResponse,
-  contentKey: string,
-): WebsiteContentBlock | null {
-  if (Array.isArray(data)) {
-    return (
-      data.find(
-        (item) =>
-          item.content_key === contentKey && item.is_active !== false,
-      ) ||
-      data.find((item) => item.content_key === contentKey) ||
-      null
+export async function getSectionContentBlocks(): Promise<WebsiteContentBlock[]> {
+  try {
+    const response = await fetch(
+      `${apiBaseUrl}/content?content_type=section&page_size=200`,
+      {
+        method: "GET",
+        cache: "no-store",
+      },
     );
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const result = (await response.json()) as ContentResponse;
+
+    return getItems(result).filter((item) => item.is_active !== false);
+  } catch {
+    return [];
   }
-
-  if (isContentListResponse(data)) {
-    const items = data.items || [];
-
-    return (
-      items.find(
-        (item) =>
-          item.content_key === contentKey && item.is_active !== false,
-      ) ||
-      items.find((item) => item.content_key === contentKey) ||
-      null
-    );
-  }
-
-  if (isWebsiteContentBlock(data)) {
-    return data;
-  }
-
-  return null;
 }
 
 export async function getWebsiteContentBlock(
   contentKey: string,
 ): Promise<WebsiteContentBlock | null> {
-  const encodedKey = encodeURIComponent(contentKey);
+  const items = await getSectionContentBlocks();
 
-  const possiblePaths = [
-    `/content/detail?content_key=${encodedKey}`,
-    `/content/detail?key=${encodedKey}`,
-    `/content?content_key=${encodedKey}`,
-    `/content?key=${encodedKey}`,
-  ];
-
-  for (const path of possiblePaths) {
-    try {
-      const result = await api.get<
-        WebsiteContentBlock | WebsiteContentBlock[] | ContentListResponse
-      >(path);
-
-      const block = getContentFromResponse(result.data, contentKey);
-
-      if (block) {
-        return block;
-      }
-    } catch {
-      // Try the next possible backend route.
-    }
-  }
-
-  return null;
+  return items.find((item) => item.content_key === contentKey) || null;
 }

@@ -272,11 +272,13 @@ function AssignAccountantCard({
       });
 
       onAssigned();
-    } catch {
-      toast.error("Failed to assign request.");
-    } finally {
-      setIsAssigning(false);
-    }
+    } catch (assignError) {
+  toast.error(
+    getSafeErrorMessage(assignError, "Failed to assign request."),
+  );
+} finally {
+  setIsAssigning(false);
+}
   };
 
   const activeAccountants = accountants.filter(

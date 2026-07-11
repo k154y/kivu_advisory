@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
@@ -15,13 +16,37 @@ import (
 const maxRequestBodyBytes = 1 << 20 // 1 MB
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
+		service:     service,
+		auditLogger: auditLogger,
 	}
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "accountant",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +129,8 @@ func (h *Handler) CreateAccountant(w http.ResponseWriter, r *http.Request) {
 		writeHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "accountant.created", createdAccountant.ID, "Accountant account created: "+createdAccountant.FullName)
 
 	response.Created(w, "accountant account created successfully", createdAccountant)
 }

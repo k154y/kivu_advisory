@@ -19,7 +19,7 @@ import {
 
 import { api } from "@/lib/api";
 import { endpoints } from "@/lib/endpoints";
-import { extractItems, extractTotalCount } from "@/lib/portal";
+import { extractItems } from "@/lib/portal";
 import { formatDate, titleCase } from "@/lib/format";
 import type { Consultation, ServiceRequest } from "@/types/api";
 
@@ -42,6 +42,19 @@ type DashboardCounts = {
   totalAccountants: number;
 };
 
+type DashboardStatsResponse = {
+  service_requests: {
+    total: number;
+    by_status: Record<string, number>;
+  };
+  consultations: {
+    total: number;
+    by_status: Record<string, number>;
+  };
+  clients: { total: number };
+  accountants: { total: number };
+};
+
 const initialCounts: DashboardCounts = {
   totalRequests: 0,
   newRequests: 0,
@@ -53,8 +66,9 @@ const initialCounts: DashboardCounts = {
 
 export default function AdminDashboardPage() {
   const [counts, setCounts] = useState<DashboardCounts>(initialCounts);
-  const [allRequests, setAllRequests] = useState<ServiceRequest[]>([]);
+  const [statusBreakdown, setStatusBreakdown] = useState<Record<string, number>>({});
   const [recentRequests, setRecentRequests] = useState<ServiceRequest[]>([]);
+  const [urgentCount, setUrgentCount] = useState(0);
   const [pendingConsultations, setPendingConsultations] = useState<Consultation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -66,55 +80,49 @@ export default function AdminDashboardPage() {
       setRefreshing(true);
     }
 
-    const [
-      requestsCount,
-      clientsCount,
-      accountantsCount,
-      servicesRequestsList,
-      consultationsList,
-    ] = await Promise.allSettled([
-      api.get(endpoints.admin.serviceRequests({ page_size: 1 })),
-      api.get(endpoints.admin.clients({ page_size: 1 })),
-      api.get(endpoints.admin.accountantAccounts({ page_size: 1 })),
-      api.get(endpoints.admin.serviceRequests({ page_size: 200 })),
+    const [statsResult, recentRequestsList, consultationsList] = await Promise.allSettled([
+      api.get<DashboardStatsResponse>(endpoints.admin.dashboardStats),
+      api.get(endpoints.admin.serviceRequests({ page_size: 20 })),
       api.get(endpoints.admin.consultations({ page_size: 6 })),
     ]);
 
-    const requestItems =
-      servicesRequestsList.status === "fulfilled"
-        ? extractItems<ServiceRequest>(servicesRequestsList.value.data)
+    const stats = statsResult.status === "fulfilled" ? statsResult.value.data : null;
+
+    const recentItems =
+      recentRequestsList.status === "fulfilled"
+        ? extractItems<ServiceRequest>(recentRequestsList.value.data)
         : [];
     const consultationItems =
       consultationsList.status === "fulfilled"
         ? extractItems<Consultation>(consultationsList.value.data)
         : [];
 
-    const sortedRequests = [...requestItems].sort((left, right) => {
+    const sortedRequests = [...recentItems].sort((left, right) => {
       const leftDate = new Date(left.created_at || left.submitted_at).getTime();
       const rightDate = new Date(right.created_at || right.submitted_at).getTime();
       return rightDate - leftDate;
     });
 
+    const byStatus = stats?.service_requests.by_status ?? {};
+
     setCounts({
-      totalRequests:
-        requestsCount.status === "fulfilled"
-          ? extractTotalCount(requestsCount.value.data)
-          : requestItems.length,
-      newRequests: requestItems.filter((request) => request.status === "new").length,
-      inProgress: requestItems.filter((request) => request.status === "in_progress").length,
-      completed: requestItems.filter((request) => request.status === "completed").length,
-      totalClients:
-        clientsCount.status === "fulfilled"
-          ? extractTotalCount(clientsCount.value.data)
-          : 0,
-      totalAccountants:
-        accountantsCount.status === "fulfilled"
-          ? extractTotalCount(accountantsCount.value.data)
-          : 0,
+      totalRequests: stats?.service_requests.total ?? recentItems.length,
+      newRequests: byStatus.new ?? 0,
+      inProgress: byStatus.in_progress ?? 0,
+      completed: byStatus.completed ?? 0,
+      totalClients: stats?.clients.total ?? 0,
+      totalAccountants: stats?.accountants.total ?? 0,
     });
 
-    setAllRequests(requestItems);
+    setStatusBreakdown(byStatus);
     setRecentRequests(sortedRequests.slice(0, 6));
+    setUrgentCount(
+      recentItems.filter(
+        (request) =>
+          request.priority === "urgent" &&
+          !["completed", "cancelled"].includes(request.status),
+      ).length,
+    );
     setPendingConsultations(
       consultationItems.filter((consultation) =>
         ["new", "contacted", "scheduled"].includes(consultation.status),
@@ -133,26 +141,14 @@ export default function AdminDashboardPage() {
     () =>
       PIPELINE.map((pipelineItem) => ({
         ...pipelineItem,
-        count: allRequests.filter((request) => request.status === pipelineItem.key).length,
+        count: statusBreakdown[pipelineItem.key] ?? 0,
       })),
-    [allRequests],
+    [statusBreakdown],
   );
 
   const totalActive = useMemo(
-    () =>
-      allRequests.filter((request) => !["completed", "cancelled"].includes(request.status))
-        .length,
-    [allRequests],
-  );
-
-  const urgentCount = useMemo(
-    () =>
-      allRequests.filter(
-        (request) =>
-          request.priority === "urgent" &&
-          !["completed", "cancelled"].includes(request.status),
-      ).length,
-    [allRequests],
+    () => counts.totalRequests - (statusBreakdown.completed ?? 0) - (statusBreakdown.cancelled ?? 0),
+    [counts.totalRequests, statusBreakdown],
   );
 
   const statCards = [
@@ -327,7 +323,7 @@ export default function AdminDashboardPage() {
             {statusCounts.map(({ key, label, color, count }) => {
               const pct =
                 totalActive > 0
-                  ? Math.round((count / Math.max(allRequests.length, 1)) * 100)
+                  ? Math.round((count / Math.max(counts.totalRequests, 1)) * 100)
                   : 0;
 
               return (

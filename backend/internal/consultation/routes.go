@@ -16,16 +16,16 @@ func RegisterRoutes(
 		return
 	}
 
+	authOnly := middleware.RequireAuth(tokenVerifier)
+
 	mux.HandleFunc(
 		apiBasePath+"/consultations",
 		handler.PublicConsultations,
 	)
 
-	adminAuth := middleware.RequireAuth(tokenVerifier)
-
 	mux.Handle(
 		apiBasePath+"/admin/consultations",
-		adminAuth(
+		authOnly(
 			middleware.RequireAdmin(
 				http.HandlerFunc(handler.AdminConsultations),
 			),
@@ -34,7 +34,7 @@ func RegisterRoutes(
 
 	mux.Handle(
 		apiBasePath+"/admin/consultations/detail",
-		adminAuth(
+		authOnly(
 			middleware.RequireAdmin(
 				http.HandlerFunc(handler.AdminConsultationDetail),
 			),
@@ -43,9 +43,36 @@ func RegisterRoutes(
 
 	mux.Handle(
 		apiBasePath+"/admin/consultations/status",
-		adminAuth(
+		authOnly(
 			middleware.RequireAdmin(
 				http.HandlerFunc(handler.AdminConsultationStatus),
+			),
+		),
+	)
+
+	mux.Handle(
+		apiBasePath+"/accountant/consultations",
+		authOnly(
+			middleware.RequireAccountant(
+				http.HandlerFunc(handler.AccountantConsultations),
+			),
+		),
+	)
+
+	mux.Handle(
+		apiBasePath+"/accountant/consultations/detail",
+		authOnly(
+			middleware.RequireAccountant(
+				http.HandlerFunc(handler.AccountantConsultationDetail),
+			),
+		),
+	)
+
+	mux.Handle(
+		apiBasePath+"/accountant/consultations/status",
+		authOnly(
+			middleware.RequireAccountant(
+				http.HandlerFunc(handler.AccountantConsultationStatus),
 			),
 		),
 	)

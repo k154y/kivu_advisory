@@ -82,6 +82,7 @@ const accountantIconByHref: Record<string, SidebarIcon> = {
   [routes.accountant.dashboard]: LayoutDashboard,
   [routes.accountant.assignedWork]: FileText,
   [routes.accountant.messages]: MessagesSquare,
+  [routes.accountant.profile]: UserCircle,
 };
 
 const getNavigationByRole = (role?: UserRole): NavigationItem[] => {

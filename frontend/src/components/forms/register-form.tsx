@@ -25,11 +25,11 @@ const strongPasswordSchema = z
 
 const registerFormSchema = z.object({
   full_name: z.string().trim().min(2, "Full name is required."),
-  company_name: z.string().trim().min(2, "Company name is required."),
+  company_name: z.string().trim().max(150).optional().or(z.literal("")),
   email: z.string().trim().email("Enter a valid email address."),
   phone: z.string().trim().min(5, "Phone number is required."),
   whatsapp: z.string().trim().optional(),
-  location: z.string().trim().min(2, "Location is required."),
+  location: z.string().trim().max(150).optional().or(z.literal("")),
   password: strongPasswordSchema,
   accept_terms: z.boolean().refine((value) => value, {
     message: "You must accept the terms before registering.",
@@ -122,9 +122,8 @@ export function RegisterForm() {
 
           <Input
             label="Company name"
-            placeholder="Company or organization"
+            placeholder="Company or organization (optional)"
             autoComplete="organization"
-            required
             error={errors.company_name?.message}
             {...register("company_name")}
           />
@@ -162,9 +161,8 @@ export function RegisterForm() {
 
           <Input
             label="Location"
-            placeholder="Rubavu, Rwanda"
+            placeholder="Rubavu, Rwanda (optional)"
             autoComplete="address-level2"
-            required
             error={errors.location?.message}
             {...register("location")}
           />

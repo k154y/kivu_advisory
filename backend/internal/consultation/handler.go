@@ -8,18 +8,44 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
+	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
 )
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
+		service:     service,
+		auditLogger: auditLogger,
 	}
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "consultation",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 type publicConsultationRequest struct {
@@ -147,7 +173,115 @@ func (h *Handler) AdminConsultationStatus(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.recordAudit(r, "consultation.status_updated", id, "Consultation status changed to "+request.Status)
+
 	response.OK(w, "consultation status updated successfully", updatedConsultation)
+}
+
+func (h *Handler) AccountantConsultations(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.MethodNotAllowed(w)
+		return
+	}
+
+	user, ok := middleware.UserFromContext(r.Context())
+	if !ok || user == nil {
+		response.Unauthorized(w, "authentication is required")
+		return
+	}
+
+	query := r.URL.Query()
+
+	filter := ListConsultationsFilter{
+		Status:           query.Get("status"),
+		ConsultationType: query.Get("consultation_type"),
+		Priority:         query.Get("priority"),
+		Search:           query.Get("search"),
+		Page:             parsePositiveInt(query.Get("page"), 1),
+		PageSize:         parsePositiveInt(query.Get("page_size"), 20),
+	}
+
+	items, totalItems, err := h.service.ListAccountant(r.Context(), user.ID, filter)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	filter = filter.Normalize()
+
+	response.OK(w, "assigned consultations retrieved successfully", map[string]any{
+		"items": items,
+		"pagination": map[string]any{
+			"page":        filter.Page,
+			"page_size":   filter.PageSize,
+			"total_items": totalItems,
+			"total_pages": totalPages(totalItems, filter.PageSize),
+		},
+	})
+}
+
+func (h *Handler) AccountantConsultationDetail(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		response.MethodNotAllowed(w)
+		return
+	}
+
+	user, ok := middleware.UserFromContext(r.Context())
+	if !ok || user == nil {
+		response.Unauthorized(w, "authentication is required")
+		return
+	}
+
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id == "" {
+		response.BadRequest(w, "consultation id is required", nil)
+		return
+	}
+
+	item, err := h.service.GetAccountantByID(r.Context(), user.ID, id)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	response.OK(w, "assigned consultation retrieved successfully", item)
+}
+
+func (h *Handler) AccountantConsultationStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPatch {
+		response.MethodNotAllowed(w)
+		return
+	}
+
+	user, ok := middleware.UserFromContext(r.Context())
+	if !ok || user == nil {
+		response.Unauthorized(w, "authentication is required")
+		return
+	}
+
+	id := strings.TrimSpace(r.URL.Query().Get("id"))
+	if id == "" {
+		response.BadRequest(w, "consultation id is required", nil)
+		return
+	}
+
+	var request consultationStatusRequest
+	if err := readJSON(w, r, &request); err != nil {
+		response.BadRequest(w, "invalid request body", map[string]string{
+			"body": err.Error(),
+		})
+		return
+	}
+
+	item, err := h.service.UpdateStatusAccountant(r.Context(), user.ID, id, request.Status)
+	if err != nil {
+		respondError(w, err)
+		return
+	}
+
+	h.recordAudit(r, "consultation.accountant_status_updated", id, "Accountant updated consultation status to "+request.Status)
+
+	response.OK(w, "assigned consultation status updated successfully", item)
 }
 
 func (h *Handler) listAdminConsultations(w http.ResponseWriter, r *http.Request) {
@@ -178,6 +312,7 @@ func (h *Handler) listAdminConsultations(w http.ResponseWriter, r *http.Request)
 			"page":        filter.Page,
 			"page_size":   filter.PageSize,
 			"total_items": totalItems,
+			"total_pages": totalPages(totalItems, filter.PageSize),
 		},
 	})
 }
@@ -225,6 +360,8 @@ func (h *Handler) updateAdminConsultation(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	h.recordAudit(r, "consultation.updated", id, "Consultation updated by admin")
+
 	response.OK(w, "consultation updated successfully", updatedConsultation)
 }
 
@@ -239,6 +376,8 @@ func (h *Handler) deleteAdminConsultation(w http.ResponseWriter, r *http.Request
 		respondError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "consultation.deleted", id, "Consultation deleted by admin")
 
 	response.OK(w, "consultation deleted successfully", nil)
 }
@@ -317,6 +456,14 @@ func parsePositiveInt(value string, fallback int) int {
 	}
 
 	return parsedValue
+}
+
+func totalPages(totalItems int, pageSize int) int {
+	if pageSize <= 0 || totalItems <= 0 {
+		return 0
+	}
+
+	return (totalItems + pageSize - 1) / pageSize
 }
 
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) error {

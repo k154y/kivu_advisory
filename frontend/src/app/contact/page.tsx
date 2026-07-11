@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import {
   Clock,
   Mail,
@@ -12,6 +12,12 @@ import {
 import { toast } from "sonner";
 
 import { PublicLayout } from "@/components/layout/public-layout";
+import { PublicSocialLinks } from "@/components/layout/public-social-links";
+import {
+  getContentText,
+  getSectionContentBlocks,
+  type WebsiteContentBlock,
+} from "@/lib/website-content";
 
 const apiBaseUrl = (
   process.env.NEXT_PUBLIC_API_BASE_URL ||
@@ -19,7 +25,55 @@ const apiBaseUrl = (
   "http://localhost:8080/api/v1"
 ).replace(/\/$/, "");
 
+const fallbackContact = {
+  heroTitle: "Contact Us",
+  heroSubtitle:
+    "We are ready to answer your questions and help you find the right service.",
+  introTitle: "Get In Touch",
+  introBody:
+    "You can reach us by phone, WhatsApp, or email. You can also visit our office during working hours. We are here to help.",
+  phoneTitle: "Phone",
+  phoneBody: "0786196355",
+  phoneUrl: "tel:0786196355",
+  whatsappTitle: "WhatsApp",
+  whatsappBody: "0786196355 — Click to message",
+  whatsappUrl: "https://wa.me/250786196355",
+  emailTitle: "Email",
+  emailBody: "info@kivuadvisory.com",
+  emailUrl: "mailto:info@kivuadvisory.com",
+  locationTitle: "Office Location",
+  locationBody: "Kigali, Rwanda",
+  hoursTitle: "Working Hours",
+  hoursBody:
+    "Monday – Friday: 8:00 AM – 6:00 PM\nSaturday: 9:00 AM – 1:00 PM\nClosed on Sundays and public holidays",
+  whatsappBoxTitle: "Prefer WhatsApp?",
+  whatsappBoxText:
+    "For quick responses, message us directly on WhatsApp. We usually respond within a few hours during working hours.",
+  whatsappBoxButton: "Message on WhatsApp",
+};
+
+function findBlock(items: WebsiteContentBlock[], key: string) {
+  return items.find((item) => item.content_key === key) || null;
+}
+
+function getBlockBody(block: WebsiteContentBlock | null, fallback: string) {
+  return getContentText(block) || fallback;
+}
+
+function getButtonUrl(block: WebsiteContentBlock | null, fallback: string) {
+  return block?.button_url || fallback;
+}
+
+function splitLines(value: string) {
+  return value
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 export default function ContactPage() {
+  const [content, setContent] = useState(fallbackContact);
+
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -28,6 +82,80 @@ export default function ContactPage() {
   });
 
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadContactContent = async () => {
+      const items = await getSectionContentBlocks();
+
+      if (cancelled) return;
+
+      const contactIntro = findBlock(items, "contact_intro");
+      const contactPhone = findBlock(items, "contact_phone");
+      const contactWhatsapp = findBlock(items, "contact_whatsapp");
+      const contactEmail = findBlock(items, "contact_email");
+      const contactLocation = findBlock(items, "contact_location");
+      const contactHours = findBlock(items, "contact_hours");
+      const contactWhatsappBox = findBlock(items, "contact_whatsapp_box");
+
+      setContent({
+        heroTitle: contactIntro?.title || fallbackContact.heroTitle,
+        heroSubtitle:
+          contactIntro?.summary || fallbackContact.heroSubtitle,
+        introTitle: fallbackContact.introTitle,
+        introBody:
+          contactIntro?.body ||
+          contactIntro?.summary ||
+          fallbackContact.introBody,
+
+        phoneTitle: contactPhone?.title || fallbackContact.phoneTitle,
+        phoneBody: getBlockBody(contactPhone, fallbackContact.phoneBody),
+        phoneUrl: getButtonUrl(contactPhone, fallbackContact.phoneUrl),
+
+        whatsappTitle:
+          contactWhatsapp?.title || fallbackContact.whatsappTitle,
+        whatsappBody: getBlockBody(
+          contactWhatsapp,
+          fallbackContact.whatsappBody,
+        ),
+        whatsappUrl: getButtonUrl(
+          contactWhatsapp,
+          fallbackContact.whatsappUrl,
+        ),
+
+        emailTitle: contactEmail?.title || fallbackContact.emailTitle,
+        emailBody: getBlockBody(contactEmail, fallbackContact.emailBody),
+        emailUrl: getButtonUrl(contactEmail, fallbackContact.emailUrl),
+
+        locationTitle:
+          contactLocation?.title || fallbackContact.locationTitle,
+        locationBody: getBlockBody(
+          contactLocation,
+          fallbackContact.locationBody,
+        ),
+
+        hoursTitle: contactHours?.title || fallbackContact.hoursTitle,
+        hoursBody: getBlockBody(contactHours, fallbackContact.hoursBody),
+
+        whatsappBoxTitle:
+          contactWhatsappBox?.title || fallbackContact.whatsappBoxTitle,
+        whatsappBoxText:
+          contactWhatsappBox?.summary ||
+          contactWhatsappBox?.body ||
+          fallbackContact.whatsappBoxText,
+        whatsappBoxButton:
+          contactWhatsappBox?.button_label ||
+          fallbackContact.whatsappBoxButton,
+      });
+    };
+
+    void loadContactContent();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -98,16 +226,18 @@ export default function ContactPage() {
   return (
     <PublicLayout>
       <>
-        {/* Hero */}
         <section className="bg-navy py-16 text-white">
           <div className="mx-auto max-w-4xl px-4 text-center sm:px-6 lg:px-8">
             <p className="mb-4 text-sm font-semibold uppercase tracking-wider text-teal">
               Get In Touch
             </p>
-            <h1 className="mb-5 text-4xl font-bold sm:text-5xl">Contact Us</h1>
+
+            <h1 className="mb-5 text-4xl font-bold sm:text-5xl">
+              {content.heroTitle}
+            </h1>
+
             <p className="text-lg text-gray-400">
-              We are ready to answer your questions and help you find the right
-              service.
+              {content.heroSubtitle}
             </p>
           </div>
         </section>
@@ -115,14 +245,13 @@ export default function ContactPage() {
         <section className="bg-softwhite py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="grid gap-12 lg:grid-cols-2">
-              {/* Contact Info */}
               <div>
                 <h2 className="mb-6 text-2xl font-bold text-navy">
-                  Get In Touch
+                  {content.introTitle}
                 </h2>
+
                 <p className="mb-8 leading-relaxed text-gray-600">
-                  You can reach us by phone, WhatsApp, or email. You can also
-                  visit our office during working hours. We are here to help.
+                  {content.introBody}
                 </p>
 
                 <div className="space-y-5">
@@ -130,13 +259,16 @@ export default function ContactPage() {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
                       <Phone size={18} className="text-teal" />
                     </div>
+
                     <div>
-                      <p className="text-sm font-semibold text-navy">Phone</p>
+                      <p className="text-sm font-semibold text-navy">
+                        {content.phoneTitle}
+                      </p>
                       <a
-                        href="tel:0786196355"
+                        href={content.phoneUrl}
                         className="text-gray-600 transition-colors hover:text-teal"
                       >
-                        0786196355
+                        {content.phoneBody}
                       </a>
                     </div>
                   </div>
@@ -145,17 +277,18 @@ export default function ContactPage() {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
                       <MessageCircle size={18} className="text-teal" />
                     </div>
+
                     <div>
                       <p className="text-sm font-semibold text-navy">
-                        WhatsApp
+                        {content.whatsappTitle}
                       </p>
                       <a
-                        href="https://wa.me/250786196355"
+                        href={content.whatsappUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-gray-600 transition-colors hover:text-teal"
                       >
-                        0786196355 — Click to message
+                        {content.whatsappBody}
                       </a>
                     </div>
                   </div>
@@ -164,13 +297,16 @@ export default function ContactPage() {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
                       <Mail size={18} className="text-teal" />
                     </div>
+
                     <div>
-                      <p className="text-sm font-semibold text-navy">Email</p>
+                      <p className="text-sm font-semibold text-navy">
+                        {content.emailTitle}
+                      </p>
                       <a
-                        href="mailto:info@kivuadvisory.com"
+                        href={content.emailUrl}
                         className="text-gray-600 transition-colors hover:text-teal"
                       >
-                        info@kivuadvisory.com
+                        {content.emailBody}
                       </a>
                     </div>
                   </div>
@@ -179,11 +315,14 @@ export default function ContactPage() {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
                       <MapPin size={18} className="text-teal" />
                     </div>
+
                     <div>
                       <p className="text-sm font-semibold text-navy">
-                        Office Location
+                        {content.locationTitle}
                       </p>
-                      <p className="text-gray-600">Kigali, Rwanda</p>
+                      <p className="text-gray-600">
+                        {content.locationBody}
+                      </p>
                     </div>
                   </div>
 
@@ -191,43 +330,56 @@ export default function ContactPage() {
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50">
                       <Clock size={18} className="text-teal" />
                     </div>
+
                     <div>
                       <p className="text-sm font-semibold text-navy">
-                        Working Hours
+                        {content.hoursTitle}
                       </p>
-                      <p className="text-sm text-gray-600">
-                        Monday – Friday: 8:00 AM – 6:00 PM
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Saturday: 9:00 AM – 1:00 PM
-                      </p>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Closed on Sundays and public holidays
-                      </p>
+
+                      {splitLines(content.hoursBody).map((line, index) => (
+                        <p
+                          key={`${line}-${index}`}
+                          className={
+                            index === splitLines(content.hoursBody).length - 1
+                              ? "mt-1 text-xs text-gray-500"
+                              : "text-sm text-gray-600"
+                          }
+                        >
+                          {line}
+                        </p>
+                      ))}
                     </div>
+                  </div>
+
+                  <div className="mt-8 rounded-xl border border-gray-100 bg-softwhite p-5">
+                    <p className="mb-3 text-sm font-semibold text-navy">
+                      Follow Us
+                    </p>
+                    <PublicSocialLinks location="contact" />
                   </div>
                 </div>
 
                 <div className="mt-8 rounded-xl border border-teal-100 bg-teal-50 p-5">
                   <p className="mb-1 text-sm font-semibold text-teal">
-                    Prefer WhatsApp?
+                    {content.whatsappBoxTitle}
                   </p>
+
                   <p className="text-sm text-gray-600">
-                    For quick responses, message us directly on WhatsApp. We
-                    usually respond within a few hours during working hours.
+                    {content.whatsappBoxText}
                   </p>
+
                   <a
-                    href="https://wa.me/250786196355"
+                    href={content.whatsappUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="mt-3 inline-flex items-center gap-2 rounded-lg bg-teal px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal-700"
                   >
-                    <MessageCircle size={16} /> Message on WhatsApp
+                    <MessageCircle size={16} />
+                    {content.whatsappBoxButton}
                   </a>
                 </div>
               </div>
 
-              {/* Contact Form */}
               <div>
                 <div className="rounded-2xl bg-lightgray p-8">
                   <h2 className="mb-6 text-xl font-bold text-navy">

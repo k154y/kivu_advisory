@@ -76,6 +76,7 @@ export function ClientDocuments({
       formData.set("file", file);
       formData.set("visibility", "shared");
       formData.set("document_type", "client_upload");
+      formData.set("is_final", "false");
 
       if (description.trim()) {
         formData.set("description", description.trim());

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Clock, Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 
+import { PublicSocialLinks } from "@/components/layout/public-social-links";
+
 const serviceLinks = [
   { href: "/services/accounting-bookkeeping", label: "Accounting & Bookkeeping" },
   { href: "/services/tax-declaration-advisory", label: "Tax Declaration" },
@@ -51,6 +53,10 @@ export function PublicFooter() {
               <p className="mb-5 text-sm font-medium italic text-gold">
                 Accuracy. Compliance. Growth.
               </p>
+
+              <div className="mt-5">
+                <PublicSocialLinks />
+              </div>
             </div>
 
             <div>
@@ -129,9 +135,7 @@ export function PublicFooter() {
 
                 <li className="flex items-start gap-3">
                   <MapPin size={15} className="mt-0.5 shrink-0 text-teal" />
-                  <span className="text-sm text-gray-400">
-                    Kigali, Rwanda
-                  </span>
+                  <span className="text-sm text-gray-400">Kigali, Rwanda</span>
                 </li>
 
                 <li className="flex items-start gap-3">

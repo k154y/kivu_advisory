@@ -168,6 +168,17 @@ export type PublicClient = {
   updated_at: string;
 };
 
+export type UpdateClientProfileRequest = {
+  company_name?: string;
+  tin?: string;
+  business_type?: string;
+  address?: string;
+  city?: string;
+  country?: string;
+  website?: string;
+  notes?: string;
+};
+
 export type ServiceItem = {
   id: string;
   title: string;

@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 	"github.com/kyves/kivu-advisory/backend/pkg/response"
@@ -18,7 +19,30 @@ import (
 const maxAssignmentRequestBodyBytes = 1 << 20 // 1 MB
 
 type Handler struct {
-	service *Service
+	service     *Service
+	auditLogger *auditlog.Service
+}
+
+func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
+	if h.auditLogger == nil {
+		return
+	}
+
+	user, _ := middleware.UserFromContext(r.Context())
+
+	input := auditlog.RecordInput{
+		Action:      action,
+		EntityType:  "assignment",
+		EntityID:    entityID,
+		Description: description,
+	}
+
+	if user != nil {
+		input.ActorUserID = user.ID
+		input.ActorRole = user.Role
+	}
+
+	h.auditLogger.Record(r.Context(), input)
 }
 
 type CreateAssignmentRequest struct {
@@ -44,9 +68,10 @@ type UpdateAssignmentStatusRequest struct {
 	InternalNotes string `json:"internal_notes"`
 }
 
-func NewHandler(service *Service) *Handler {
+func NewHandler(service *Service, auditLogger *auditlog.Service) *Handler {
 	return &Handler{
-		service: service,
+		service:     service,
+		auditLogger: auditLogger,
 	}
 }
 
@@ -114,6 +139,8 @@ func (h *Handler) CreateAssignment(w http.ResponseWriter, r *http.Request) {
 		writeAssignmentHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "assignment.created", createdAssignment.ID, "Assignment created for service request "+createdAssignment.ServiceRequestID)
 
 	response.Created(w, "assignment created successfully", createdAssignment)
 }
@@ -199,6 +226,8 @@ func (h *Handler) UpdateAdminAssignmentStatus(w http.ResponseWriter, r *http.Req
 		writeAssignmentHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "assignment.status_updated", assignmentID, "Assignment status changed to "+request.Status)
 
 	response.OK(w, "assignment status updated successfully", updatedAssignment)
 }
@@ -324,6 +353,8 @@ func (h *Handler) UpdateAccountantAssignmentStatus(w http.ResponseWriter, r *htt
 		writeAssignmentHandlerError(w, err)
 		return
 	}
+
+	h.recordAudit(r, "assignment.status_updated", assignmentID, "Assignment status changed to "+request.Status+" by accountant")
 
 	response.OK(w, "accountant assignment status updated successfully", updatedAssignment)
 }
