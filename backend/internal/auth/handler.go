@@ -145,6 +145,59 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, "authenticated user retrieved successfully", currentUser)
 }
 
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.service == nil {
+		response.InternalServerError(w)
+		return
+	}
+
+	currentUser, ok := middleware.UserFromContext(r.Context())
+	if !ok || currentUser == nil {
+		response.Unauthorized(w, "authentication is required")
+		return
+	}
+
+	var request UpdateProfileRequest
+	if err := readJSON(w, r, &request); err != nil {
+		writeHandlerError(w, err)
+		return
+	}
+
+	updatedUser, err := h.service.UpdateProfile(r.Context(), currentUser.ID, request)
+	if err != nil {
+		writeHandlerError(w, err)
+		return
+	}
+
+	response.OK(w, "profile updated successfully", updatedUser)
+}
+
+func (h *Handler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.service == nil {
+		response.InternalServerError(w)
+		return
+	}
+
+	currentUser, ok := middleware.UserFromContext(r.Context())
+	if !ok || currentUser == nil {
+		response.Unauthorized(w, "authentication is required")
+		return
+	}
+
+	var request ChangePasswordRequest
+	if err := readJSON(w, r, &request); err != nil {
+		writeHandlerError(w, err)
+		return
+	}
+
+	if err := h.service.ChangePassword(r.Context(), currentUser.ID, request); err != nil {
+		writeHandlerError(w, err)
+		return
+	}
+
+	response.OK(w, "password changed successfully", nil)
+}
+
 func readJSON(w http.ResponseWriter, r *http.Request, destination any) error {
 	if r.Body == nil {
 		return apperrors.InvalidInput("request body is required")

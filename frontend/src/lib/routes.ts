@@ -34,6 +34,9 @@ export const routes = {
     profile: "/admin/profile",
     auditLog: "/admin/audit-log",
 
+    taxCredentialSystems: "/admin/tax-credential-systems",
+    taxCredentials: "/admin/tax-credentials",
+
     contentManager: "/admin/content",
     content: {
       homepage: "/admin/content/homepage",
@@ -94,6 +97,14 @@ export const adminNavigation = [
   { label: "Accountants", href: routes.admin.accountants },
   { label: "My Documents", href: routes.admin.documents },
   { label: "Messages", href: routes.admin.messages },
+  {
+    label: "Tax Systems",
+    href: routes.admin.taxCredentialSystems,
+  },
+  {
+    label: "Tax Credentials",
+    href: routes.admin.taxCredentials,
+  },
   { label: "My Profile", href: routes.admin.profile },
   { label: "Audit Log", href: routes.admin.auditLog },
 

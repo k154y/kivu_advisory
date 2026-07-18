@@ -14,6 +14,8 @@ type UserService interface {
 	CreateAccountant(ctx context.Context, input userpkg.CreateAccountantInput) (*userpkg.PublicUser, error)
 	Authenticate(ctx context.Context, email string, plainPassword string) (*userpkg.User, error)
 	GetFullByID(ctx context.Context, id string) (*userpkg.User, error)
+	UpdateProfile(ctx context.Context, id string, input userpkg.UpdateProfileInput) (*userpkg.PublicUser, error)
+	ChangePassword(ctx context.Context, id string, input userpkg.ChangePasswordInput) error
 }
 
 type ClientService interface {
@@ -137,6 +139,35 @@ func (s *Service) RefreshToken(ctx context.Context, request RefreshTokenRequest)
 	}
 
 	return s.tokenManager.GenerateTokenPair(authUserFromUser(foundUser))
+}
+
+func (s *Service) UpdateProfile(ctx context.Context, id string, request UpdateProfileRequest) (*userpkg.PublicUser, error) {
+	if s == nil || s.users == nil {
+		return nil, apperrors.Internal("auth service is not initialized")
+	}
+
+	input := userpkg.UpdateProfileInput{
+		FullName:    strings.TrimSpace(request.FullName),
+		CompanyName: strings.TrimSpace(request.CompanyName),
+		Phone:       strings.TrimSpace(request.Phone),
+		WhatsApp:    strings.TrimSpace(request.WhatsApp),
+		Location:    strings.TrimSpace(request.Location),
+	}
+
+	return s.users.UpdateProfile(ctx, id, input)
+}
+
+func (s *Service) ChangePassword(ctx context.Context, id string, request ChangePasswordRequest) error {
+	if s == nil || s.users == nil {
+		return apperrors.Internal("auth service is not initialized")
+	}
+
+	input := userpkg.ChangePasswordInput{
+		CurrentPassword: request.CurrentPassword,
+		NewPassword:     request.NewPassword,
+	}
+
+	return s.users.ChangePassword(ctx, id, input)
 }
 
 func authUserFromUser(foundUser *userpkg.User) AuthenticatedUser {

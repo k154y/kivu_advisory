@@ -424,7 +424,7 @@ func mapPostgresError(err error) error {
 		}
 	}
 
-	return apperrors.InternalWrap(err, "database operation failed: "+err.Error())
+	return apperrors.InternalWrap(err, "database operation failed: ")
 }
 
 var _ = time.Time{}

@@ -1,186 +1,323 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { BarChart2, Briefcase, Calendar, UserCheck, Users } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Save, TrendingUp } from "lucide-react";
+import { toast } from "sonner";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
-import { LoadingState } from "@/components/ui/loading-state";
 import { api } from "@/lib/api";
-import { endpoints } from "@/lib/endpoints";
-import { titleCase } from "@/lib/format";
-import { getSafeErrorMessage } from "@/lib/portal";
 
-type DashboardStatsResponse = {
-  service_requests: {
-    total: number;
-    by_status: Record<string, number>;
-  };
-  consultations: {
-    total: number;
-    by_status: Record<string, number>;
-  };
-  clients: { total: number };
-  accountants: { total: number };
+type Statistic = {
+  id: string;
+  value: string;
+  label: string;
+  description?: string;
+  display_order?: number;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
 };
 
-function StatusBreakdown({
-  title,
-  total,
-  byStatus,
-}: {
-  title: string;
-  total: number;
-  byStatus: Record<string, number>;
-}) {
-  return (
-    <Card>
-      <CardHeader className="border-b border-slate-100">
-        <CardTitle>{title}</CardTitle>
-        <p className="mt-1 text-sm text-slate-500">{total} total</p>
-      </CardHeader>
-      <CardContent className="space-y-3 pt-6">
-        {Object.entries(byStatus).map(([status, count]) => {
-          const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+type StatEdit = {
+  value?: string;
+  label?: string;
+  description?: string;
+};
 
-          return (
-            <div key={status}>
-              <div className="mb-1 flex items-center justify-between text-sm">
-                <span className="text-slate-700">{titleCase(status)}</span>
-                <span className="font-semibold text-slate-900">{count}</span>
-              </div>
-              <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className="h-full rounded-full bg-[#0F2742]"
-                  style={{ width: `${Math.max(pct, count > 0 ? 3 : 0)}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </CardContent>
-    </Card>
-  );
+const statisticPaths = {
+  list: "/admin/statistics?page_size=100",
+  detail: (id: string) =>
+    `/admin/statistics/detail?id=${encodeURIComponent(id)}`,
+};
+
+function getStatisticItems(response: unknown): Statistic[] {
+  if (Array.isArray(response)) {
+    return response as Statistic[];
+  }
+
+  if (!response || typeof response !== "object") {
+    return [];
+  }
+
+  const objectResponse = response as {
+    items?: Statistic[];
+    data?: Statistic[] | { items?: Statistic[] };
+  };
+
+  if (Array.isArray(objectResponse.items)) {
+    return objectResponse.items;
+  }
+
+  if (Array.isArray(objectResponse.data)) {
+    return objectResponse.data;
+  }
+
+  if (
+    objectResponse.data &&
+    !Array.isArray(objectResponse.data) &&
+    Array.isArray(objectResponse.data.items)
+  ) {
+    return objectResponse.data.items;
+  }
+
+  return [];
+}
+
+function getSafeErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function buildPayload(stat: Statistic, patch: StatEdit) {
+  return {
+    value: patch.value ?? stat.value,
+    label: patch.label ?? stat.label,
+    description: patch.description ?? stat.description ?? "",
+    display_order: stat.display_order ?? 0,
+    is_active: stat.is_active ?? true,
+  };
 }
 
 export default function AdminStatisticsPage() {
-  const [stats, setStats] = useState<DashboardStatsResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [stats, setStats] = useState<Statistic[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [edits, setEdits] = useState<Record<string, StatEdit>>({});
+  const [saving, setSaving] = useState<string | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  const load = useCallback(async () => {
+    setLoading(true);
 
-    const load = async () => {
-      setIsLoading(true);
-      setError(null);
+    try {
+      const result = await api.get<unknown>(statisticPaths.list);
+      const items = getStatisticItems(result.data).sort(
+        (a, b) => (a.display_order || 0) - (b.display_order || 0),
+      );
 
-      try {
-        const result = await api.get<DashboardStatsResponse>(
-          endpoints.admin.dashboardStats,
-        );
-
-        if (!cancelled) {
-          setStats(result.data);
-        }
-      } catch (loadError) {
-        if (!cancelled) {
-          setStats(null);
-          setError(getSafeErrorMessage(loadError, "Statistics could not be loaded."));
-        }
-      } finally {
-        if (!cancelled) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    void load();
-
-    return () => {
-      cancelled = true;
-    };
+      setStats(items);
+    } catch (error) {
+      toast.error(
+        getSafeErrorMessage(error, "Failed to load statistics."),
+      );
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const update = (id: string, field: keyof StatEdit, value: string) => {
+    setEdits((current) => ({
+      ...current,
+      [id]: {
+        ...(current[id] || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const get = (stat: Statistic, field: keyof StatEdit) => {
+    const editedValue = edits[stat.id]?.[field];
+
+    if (editedValue !== undefined) {
+      return editedValue;
+    }
+
+    if (field === "value") return stat.value || "";
+    if (field === "label") return stat.label || "";
+    if (field === "description") return stat.description || "";
+
+    return "";
+  };
+
+  const hasChanges = (id: string) => {
+    return Boolean(edits[id] && Object.keys(edits[id]).length > 0);
+  };
+
+  const handleSave = async (stat: Statistic) => {
+    const patch = edits[stat.id];
+
+    if (!patch || Object.keys(patch).length === 0) {
+      toast.info("No changes to save.");
+      return;
+    }
+
+    setSaving(stat.id);
+
+    try {
+      const payload = buildPayload(stat, patch);
+
+      await api.put(statisticPaths.detail(stat.id), payload);
+
+      toast.success(`"${payload.label}" updated.`);
+
+      setStats((current) =>
+        current.map((item) =>
+          item.id === stat.id
+            ? {
+                ...item,
+                ...payload,
+              }
+            : item,
+        ),
+      );
+
+      setEdits((current) => {
+        const next = { ...current };
+        delete next[stat.id];
+        return next;
+      });
+    } catch (error) {
+      toast.error(
+        getSafeErrorMessage(error, "Failed to save statistic."),
+      );
+    } finally {
+      setSaving(null);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div className="rounded-[28px] bg-[#092B44] p-6 text-white">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#C99A35]">
-          Statistics
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">Business statistics</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">
-          Accurate totals and status breakdowns across service requests and
-          consultations, drawn directly from the backend.
+    <div className="max-w-3xl">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-navy">Statistics</h1>
+        <p className="mt-1 text-sm text-gray-500">
+          Update the numbers displayed in the homepage statistics bar.
         </p>
       </div>
 
-      {isLoading ? (
-        <LoadingState
-          title="Loading statistics"
-          description="Fetching the latest business statistics."
-        />
-      ) : error || !stats ? (
-        <EmptyState
-          title="Statistics unavailable"
-          description={error || "Statistics could not be loaded."}
-          icon={<BarChart2 className="h-5 w-5" />}
-        />
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3, 4].map((item) => (
+            <div
+              key={item}
+              className="h-28 animate-pulse rounded-xl border border-gray-100 bg-white p-5"
+            />
+          ))}
+        </div>
+      ) : stats.length === 0 ? (
+        <div className="rounded-xl border border-gray-100 bg-white p-8 text-center text-sm text-gray-400">
+          No statistics found.
+        </div>
       ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-            {[
-              {
-                label: "Service Requests",
-                value: stats.service_requests.total,
-                icon: Briefcase,
-              },
-              {
-                label: "Consultations",
-                value: stats.consultations.total,
-                icon: Calendar,
-              },
-              {
-                label: "Clients",
-                value: stats.clients.total,
-                icon: Users,
-              },
-              {
-                label: "Accountants",
-                value: stats.accountants.total,
-                icon: UserCheck,
-              },
-            ].map(({ label, value, icon: Icon }) => (
+        <div className="space-y-4">
+          {stats.map((stat) => {
+            const changed = hasChanges(stat.id);
+
+            return (
               <div
-                key={label}
-                className="rounded-xl border border-gray-100 bg-white p-5"
+                key={stat.id}
+                className={`rounded-xl border bg-white p-5 transition-colors ${
+                  changed ? "border-teal/40" : "border-gray-100"
+                }`}
               >
-                <div className="mb-3 flex items-center justify-between">
-                  <span className="text-xs font-medium uppercase tracking-wider text-gray-500">
-                    {label}
-                  </span>
-                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-navy-50 text-navy">
-                    <Icon size={16} />
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gold/10">
+                      <TrendingUp size={15} className="text-gold" />
+                    </div>
+
+                    <div>
+                      <p className="text-sm font-semibold text-navy">
+                        {get(stat, "label") || "Statistic"}
+                      </p>
+
+                      {changed ? (
+                        <p className="text-xs text-teal">
+                          Unsaved changes
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => void handleSave(stat)}
+                    disabled={saving === stat.id || !changed}
+                    className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-navy-700 disabled:cursor-default disabled:opacity-40"
+                  >
+                    <Save size={12} />
+                    {saving === stat.id ? "Saving..." : "Save"}
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">
+                      Value *
+                    </label>
+
+                    <input
+                      type="text"
+                      value={get(stat, "value")}
+                      onChange={(event) =>
+                        update(stat.id, "value", event.target.value)
+                      }
+                      placeholder="500+"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal/30"
+                    />
+
+                    <p className="mt-1 text-xs text-gray-400">
+                      Include suffix in the value, for example 500+ or 98%.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="mb-1 block text-xs text-gray-500">
+                      Label *
+                    </label>
+
+                    <input
+                      type="text"
+                      value={get(stat, "label")}
+                      onChange={(event) =>
+                        update(stat.id, "label", event.target.value)
+                      }
+                      placeholder="Clients Served"
+                      className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal/30"
+                    />
                   </div>
                 </div>
-                <p className="text-3xl font-bold text-navy">{value}</p>
-              </div>
-            ))}
-          </div>
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <StatusBreakdown
-              title="Service requests by status"
-              total={stats.service_requests.total}
-              byStatus={stats.service_requests.by_status}
-            />
-            <StatusBreakdown
-              title="Consultations by status"
-              total={stats.consultations.total}
-              byStatus={stats.consultations.by_status}
-            />
-          </div>
-        </>
+                <div className="mt-3">
+                  <label className="mb-1 block text-xs text-gray-500">
+                    Description
+                  </label>
+
+                  <textarea
+                    rows={2}
+                    value={get(stat, "description")}
+                    onChange={(event) =>
+                      update(stat.id, "description", event.target.value)
+                    }
+                    placeholder="Optional short description"
+                    className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal/30"
+                  />
+                </div>
+
+                <div className="mt-3 rounded-lg bg-lightgray p-3">
+                  <p className="text-xs text-gray-500">
+                    Preview:{" "}
+                    <span className="font-bold text-navy">
+                      {get(stat, "value") || "—"}
+                    </span>{" "}
+                    <span className="text-gray-600">
+                      {get(stat, "label") || "Statistic label"}
+                    </span>
+                  </p>
+
+                  {get(stat, "description") ? (
+                    <p className="mt-1 text-xs text-gray-400">
+                      {get(stat, "description")}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );

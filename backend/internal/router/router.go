@@ -10,8 +10,10 @@ import (
 
 	"github.com/kyves/kivu-advisory/backend/internal/accountant"
 	"github.com/kyves/kivu-advisory/backend/internal/notification"
-	"github.com/kyves/kivu-advisory/backend/internal/staff"
 	"github.com/kyves/kivu-advisory/backend/internal/sociallink"
+	"github.com/kyves/kivu-advisory/backend/internal/staff"
+	"github.com/kyves/kivu-advisory/backend/internal/statistic"
+	"github.com/kyves/kivu-advisory/backend/internal/taxcredential"
 
 	"github.com/kyves/kivu-advisory/backend/internal/assignment"
 	"github.com/kyves/kivu-advisory/backend/internal/auditlog"
@@ -129,6 +131,25 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	socialLinkRepository := sociallink.NewPostgresRepository(options.DatabasePool)
 	socialLinkService := sociallink.NewService(socialLinkRepository)
 
+	statisticRepository := statistic.NewPostgresRepository(options.DatabasePool)
+	statisticService := statistic.NewService(statisticRepository)
+
+	taxCredentialSystemRepository := taxcredential.NewPostgresSystemRepository(options.DatabasePool)
+	taxCredentialRepository := taxcredential.NewPostgresCredentialRepository(options.DatabasePool)
+
+	taxCredentialEncryptor, err := taxcredential.NewEncryptorFromEnv()
+	if err != nil {
+		panic(err)
+	}
+
+	taxCredentialService := taxcredential.NewService(
+		taxCredentialSystemRepository,
+		taxCredentialRepository,
+		taxCredentialEncryptor,
+	)
+
+	
+
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -158,6 +179,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	notificationHandler := notification.NewHandler(notificationService)
 	staffHandler := staff.NewHandler(staffService, auditLogService)
 	testimonialHandler := testimonial.NewHandler(testimonialService)
+	statisticHandler := statistic.NewHandler(statisticService)
 	dashboardHandler := dashboard.NewHandler(
 		serviceRequestService,
 		consultationService,
@@ -166,6 +188,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	)
 	auditLogHandler := auditlog.NewHandler(auditLogService)
 	socialLinkHandler := sociallink.NewHandler(socialLinkService)
+	taxCredentialHandler := taxcredential.NewHandler(taxCredentialService)
 	auth.RegisterRoutes(
 		mux,
 		options.Config.Server.APIBasePath,
@@ -250,12 +273,11 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		tokenManager,
 	)
 
-
 	staff.RegisterRoutes(
-	mux,
-	options.Config.Server.APIBasePath,
-	staffHandler,
-	tokenManager,
+		mux,
+		options.Config.Server.APIBasePath,
+		staffHandler,
+		tokenManager,
 	)
 
 	testimonial.RegisterRoutes(
@@ -283,6 +305,20 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		mux,
 		options.Config.Server.APIBasePath,
 		socialLinkHandler,
+		tokenManager,
+	)
+
+	statistic.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		statisticHandler,
+		tokenManager,
+	)
+
+	taxcredential.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		taxCredentialHandler,
 		tokenManager,
 	)
 
@@ -393,11 +429,37 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 		mux.HandleFunc(api+"/admin/social-links", notImplemented("admin social links route requires database connection"))
 		mux.HandleFunc(api+"/admin/social-links/detail", notImplemented("admin social link detail route requires database connection"))
 		mux.HandleFunc(api+"/admin/social-links/status", notImplemented("admin social link status route requires database connection"))
+
+		mux.HandleFunc(api+"/statistics", notImplemented("statistics route requires database connection"))
+		mux.HandleFunc(api+"/admin/statistics", notImplemented("admin statistics route requires database connection"))
+		mux.HandleFunc(api+"/admin/statistics/detail", notImplemented("admin statistic detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/statistics/status", notImplemented("admin statistic status route requires database connection"))
+
+		mux.HandleFunc(api+"/tax-credential-systems", notImplemented("tax credential systems route requires database connection"))
+
+		mux.HandleFunc(api+"/admin/tax-credential-systems", notImplemented("admin tax credential systems route requires database connection"))
+		mux.HandleFunc(api+"/admin/tax-credential-systems/detail", notImplemented("admin tax credential system detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/tax-credential-systems/status", notImplemented("admin tax credential system status route requires database connection"))
+
+		mux.HandleFunc(api+"/client/tax-credentials", notImplemented("client tax credentials route requires database connection"))
+		mux.HandleFunc(api+"/client/tax-credentials/detail", notImplemented("client tax credential detail route requires database connection"))
+		mux.HandleFunc(api+"/client/tax-credentials/reveal", notImplemented("client tax credential reveal route requires database connection"))
+
+		mux.HandleFunc(api+"/admin/tax-credentials", notImplemented("admin tax credentials route requires database connection"))
+		mux.HandleFunc(api+"/admin/tax-credentials/detail", notImplemented("admin tax credential detail route requires database connection"))
+		mux.HandleFunc(api+"/admin/tax-credentials/status", notImplemented("admin tax credential status route requires database connection"))
+		mux.HandleFunc(api+"/admin/tax-credentials/reveal", notImplemented("admin tax credential reveal route requires database connection"))
+
+		mux.HandleFunc(api+"/accountant/tax-credentials", notImplemented("accountant tax credentials route requires database connection"))
+		mux.HandleFunc(api+"/accountant/tax-credentials/detail", notImplemented("accountant tax credential detail route requires database connection"))
+		mux.HandleFunc(api+"/accountant/tax-credentials/reveal", notImplemented("accountant tax credential reveal route requires database connection"))
 	}
 
 	mux.HandleFunc(api+"/admin", notImplemented("admin route is not implemented yet"))
 	mux.HandleFunc(api+"/client", notImplemented("client route is not implemented yet"))
 	mux.HandleFunc(api+"/accountant", notImplemented("accountant route is not implemented yet"))
+
+
 }
 
 func healthHandler(cfg *config.Config) http.HandlerFunc {

@@ -58,6 +58,14 @@ type TokenResponse struct {
 	User                  AuthenticatedUser `json:"user"`
 }
 
+type UpdateProfileRequest struct {
+	FullName    string `json:"full_name"`
+	CompanyName string `json:"company_name"`
+	Phone       string `json:"phone"`
+	WhatsApp    string `json:"whatsapp"`
+	Location    string `json:"location"`
+}
+
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }

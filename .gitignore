@@ -35,3 +35,11 @@ backend/server
 # Real environment files
 deployment/env/*.env
 !deployment/env/*.env.example
+
+# Environment secrets
+ deployment/env/backend.staging.env
+ deployment/env/backend.production.env
+
+# Environment secrets
+deployment/env/backend.staging.env
+deployment/env/backend.production.env

@@ -163,13 +163,12 @@ export default function AboutPage() {
                 </div>
               ))}
             </div>
-
             <Link
               href="/request-service"
-              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-navy px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-700"
+              className="mt-8 inline-flex items-center gap-2 rounded-lg bg-navy px-6 py-3 text-sm font-semibold !text-white transition-colors hover:bg-teal"
             >
-              Request a Service
-              <ArrowRight size={16} />
+              <span className="!text-white">Request a Service</span>
+              <ArrowRight size={16} className="!text-white" />
             </Link>
           </div>
         </div>

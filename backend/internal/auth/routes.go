@@ -36,13 +36,29 @@ func RegisterRoutes(
 	)
 
 	mux.Handle(
-        http.MethodPost+" "+api+"/admin/accountants",
-        middleware.RequireAuth(tokenVerifier)(
-                middleware.RequireRole(middleware.RoleAdmin)(
-                        http.HandlerFunc(handler.CreateAccountant),
-                ),
-        ),
-)
+		api+"/auth/profile",
+		methodOnlyHandler(
+			http.MethodPut,
+			middleware.RequireAuth(tokenVerifier)(http.HandlerFunc(handler.UpdateProfile)),
+		),
+	)
+
+	mux.Handle(
+		api+"/auth/change-password",
+		methodOnlyHandler(
+			http.MethodPatch,
+			middleware.RequireAuth(tokenVerifier)(http.HandlerFunc(handler.ChangePassword)),
+		),
+	)
+
+	mux.Handle(
+		http.MethodPost+" "+api+"/admin/accountants",
+		middleware.RequireAuth(tokenVerifier)(
+			middleware.RequireRole(middleware.RoleAdmin)(
+				http.HandlerFunc(handler.CreateAccountant),
+			),
+		),
+	)
 }
 
 func methodOnly(method string, handler http.HandlerFunc) http.HandlerFunc {

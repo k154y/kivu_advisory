@@ -35,7 +35,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   success:
     "bg-emerald-600 text-white shadow-sm hover:bg-emerald-700 focus-visible:ring-emerald-600",
   link:
-    "bg-transparent p-0 text-[#0F2742] underline-offset-4 hover:underline focus-visible:ring-[#0F2742]",
+    "bg-transparent p-0 text-white underline-offset-4 hover:underline focus-visible:ring-[#0F2742]",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

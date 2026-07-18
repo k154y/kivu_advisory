@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, LogOut, Menu, X } from "lucide-react";
+import { LayoutDashboard, LogOut, Menu, X ,ArrowRight} from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/hooks/use-auth";
@@ -117,11 +117,13 @@ export function PublicNavbar() {
               </Link>
             )}
 
-            <Link
+           <Link
               href="/request-service"
-              className="rounded-lg bg-navy px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-navy-700"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-navy px-5 text-sm font-semibold transition-colors hover:bg-teal"
+              style={{ color: "white" }}
             >
-              Request a Service
+              <span style={{ color: "white" }}>Request a Service</span>
+              <ArrowRight size={16} style={{ color: "white" }} />
             </Link>
           </div>
 

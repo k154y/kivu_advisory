@@ -21,12 +21,13 @@ import {
   UserCircle,
   Users,
   X,
+  KeyRound,
+
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/hooks/use-auth";
 import {
-  accountantNavigation,
   adminNavigation,
   clientNavigation,
   routes,
@@ -36,6 +37,7 @@ import type { UserRole } from "@/types/api";
 
 type DashboardSidebarProps = {
   className?: string;
+  variant?: "admin" | "accountant" | "client";
 };
 
 type NavigationItem = {
@@ -46,10 +48,41 @@ type NavigationItem = {
 type SidebarContentProps = {
   className?: string;
   onClose?: () => void;
+  variant?: "admin" | "accountant" | "client";
 };
 
 type SidebarIcon = ComponentType<{ size?: number; className?: string }>;
 
+const accountantNavigation: NavigationItem[] = [
+  {
+    label: "Dashboard",
+    href: "/accountant/dashboard",
+  },
+  {
+    label: "Assigned Work",
+    href: "/accountant/assigned-work",
+  },
+  {
+    label: "Consultations",
+    href: "/accountant/consultation",
+  },
+  {
+    label: "My Documents",
+    href: "/accountant/documents",
+  },
+  {
+    label: "Messages",
+    href: "/accountant/messages",
+  },
+  {
+    label: "Tax Credentials",
+    href: "/accountant/tax-credentials",
+  },
+  {
+    label: "My Profile",
+    href: "/accountant/profile",
+  },
+];
 const adminIconByHref: Record<string, SidebarIcon> = {
   [routes.admin.dashboard]: LayoutDashboard,
   [routes.admin.requests]: FileText,
@@ -68,6 +101,10 @@ const adminIconByHref: Record<string, SidebarIcon> = {
   [routes.admin.socialLinks]: Edit3,
   [routes.admin.statistics]: BarChart2,
   [routes.admin.settings]: ShieldCheck,
+  [routes.admin.taxCredentialSystems]: KeyRound,
+  [routes.admin.taxCredentials]: KeyRound,
+
+
 };
 
 const clientIconByHref: Record<string, SidebarIcon> = {
@@ -79,43 +116,69 @@ const clientIconByHref: Record<string, SidebarIcon> = {
 };
 
 const accountantIconByHref: Record<string, SidebarIcon> = {
-  [routes.accountant.dashboard]: LayoutDashboard,
-  [routes.accountant.assignedWork]: FileText,
-  [routes.accountant.messages]: MessagesSquare,
-  [routes.accountant.profile]: UserCircle,
+  "/accountant/dashboard": LayoutDashboard,
+  "/accountant/assigned-work": FileText,
+  "/accountant/consultation": Calendar,
+  "/accountant/documents": FolderOpen,
+  "/accountant/messages": MessagesSquare,
+  "/accountant/profile": UserCircle,
+  "/accountant/tax-credentials": KeyRound,
 };
 
-const getNavigationByRole = (role?: UserRole): NavigationItem[] => {
-  if (role === "admin") return adminNavigation;
-  if (role === "client") return clientNavigation;
-  if (role === "accountant") return accountantNavigation;
+const getNavigationByRole = (
+  role?: UserRole,
+  variant?: "admin" | "accountant" | "client",
+): NavigationItem[] => {
+  const effectiveRole = variant || role;
+
+  if (effectiveRole === "admin") return adminNavigation;
+  if (effectiveRole === "client") return clientNavigation;
+  if (effectiveRole === "accountant") return accountantNavigation;
 
   return [];
 };
 
-const getIconByRoleAndHref = (role: UserRole | undefined, href: string) => {
-  if (role === "admin") return adminIconByHref[href] || FileText;
-  if (role === "client") return clientIconByHref[href] || FileText;
-  if (role === "accountant") return accountantIconByHref[href] || FileText;
+const getIconByRoleAndHref = (
+  role: UserRole | undefined,
+  href: string,
+  variant?: "admin" | "accountant" | "client",
+) => {
+  const effectiveRole = variant || role;
+
+  if (effectiveRole === "admin") return adminIconByHref[href] || FileText;
+  if (effectiveRole === "client") return clientIconByHref[href] || FileText;
+  if (effectiveRole === "accountant") {
+    return accountantIconByHref[href] || FileText;
+  }
 
   return FileText;
 };
 
-const getRoleLabel = (role?: UserRole) => {
-  if (role === "admin") return "Administrator";
-  if (role === "client") return "Client";
-  if (role === "accountant") return "Accountant";
+const getRoleLabel = (
+  role?: UserRole,
+  variant?: "admin" | "accountant" | "client",
+) => {
+  const effectiveRole = variant || role;
+
+  if (effectiveRole === "admin") return "Administrator";
+  if (effectiveRole === "client") return "Client";
+  if (effectiveRole === "accountant") return "Accountant";
 
   return "User";
 };
 
-function SidebarContent({ className, onClose }: SidebarContentProps) {
+function SidebarContent({
+  className,
+  onClose,
+  variant,
+}: SidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
 
-  const navigation = getNavigationByRole(user?.role);
+  const navigation = getNavigationByRole(user?.role, variant);
   const displayName = user?.full_name || user?.email || "User";
+  const effectiveRole = variant || user?.role;
 
   const handleLogout = () => {
     logout();
@@ -127,7 +190,7 @@ function SidebarContent({ className, onClose }: SidebarContentProps) {
   return (
     <aside
       className={cn(
-        "flex h-full min-h-screen w-72 shrink-0 flex-col overflow-hidden bg-navy text-white",
+        "flex h-full min-h-screen w-60 shrink-0 flex-col overflow-hidden bg-navy text-white",
         className,
       )}
     >
@@ -150,14 +213,21 @@ function SidebarContent({ className, onClose }: SidebarContentProps) {
         ) : null}
       </div>
 
+      <div className="border-b border-white/10 px-5 py-3">
+        <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+          {getRoleLabel(user?.role, variant)}
+        </p>
+      </div>
+
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
-        {navigation.map((item, index) => {
-          const Icon = getIconByRoleAndHref(user?.role, item.href);
+        {navigation.map((item) => {
+          const Icon = getIconByRoleAndHref(user?.role, item.href, variant);
+
           const active =
             pathname === item.href || pathname.startsWith(`${item.href}/`);
 
           const shouldAddSeparator =
-            user?.role === "admin" &&
+            effectiveRole === "admin" &&
             item.href === routes.admin.contentManager;
 
           return (
@@ -196,7 +266,7 @@ function SidebarContent({ className, onClose }: SidebarContentProps) {
             </p>
 
             <p className="truncate text-xs capitalize text-gray-400">
-              {getRoleLabel(user?.role)}
+              {getRoleLabel(user?.role, variant)}
             </p>
           </div>
         </div>
@@ -214,13 +284,16 @@ function SidebarContent({ className, onClose }: SidebarContentProps) {
   );
 }
 
-export function DashboardSidebar({ className }: DashboardSidebarProps) {
+export function DashboardSidebar({
+  className,
+  variant,
+}: DashboardSidebarProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <>
-      <div className="hidden lg:block">
-        <SidebarContent className={className} />
+      <div className="fixed left-0 top-0 z-30 hidden h-screen lg:block">
+        <SidebarContent className={className} variant={variant} />
       </div>
 
       <button
@@ -241,7 +314,10 @@ export function DashboardSidebar({ className }: DashboardSidebarProps) {
           />
 
           <div className="fixed left-0 top-0 z-50 h-full lg:hidden">
-            <SidebarContent onClose={() => setMobileOpen(false)} />
+            <SidebarContent
+              variant={variant}
+              onClose={() => setMobileOpen(false)}
+            />
           </div>
         </>
       ) : null}
