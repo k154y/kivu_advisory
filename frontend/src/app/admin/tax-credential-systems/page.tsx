@@ -1,21 +1,27 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { KeyRound, Plus, RefreshCcw, ShieldCheck } from "lucide-react";
+import {
+  Edit3,
+  ExternalLink,
+  KeyRound,
+  Plus,
+  RefreshCcw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-import { CredentialCard } from "@/components/tax-credentials/CredentialCard";
+import { StatusBadge } from "@/components/tax-credentials/StatusBadge";
 import {
-  CredentialForm,
-  type ClientTaxCredential,
-  type CredentialCreatePayload,
-  type CredentialUpdatePayload,
-} from "@/components/tax-credentials/CredentialForm";
-import type { TaxCredentialSystem } from "@/components/tax-credentials/SystemForm";
+  SystemForm,
+  type TaxCredentialSystem,
+  type TaxCredentialSystemPayload,
+} from "@/components/tax-credentials/SystemForm";
 
 function getItems<T>(response: unknown): T[] {
   if (Array.isArray(response)) return response as T[];
+
   if (!response || typeof response !== "object") return [];
 
   const objectResponse = response as {
@@ -25,6 +31,7 @@ function getItems<T>(response: unknown): T[] {
 
   if (Array.isArray(objectResponse.items)) return objectResponse.items;
   if (Array.isArray(objectResponse.data)) return objectResponse.data;
+
   if (
     objectResponse.data &&
     !Array.isArray(objectResponse.data) &&
@@ -41,36 +48,45 @@ function getSafeErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-export default function ClientTaxCredentialsPage() {
+function formatDate(value?: string) {
+  if (!value) return "—";
+
+  try {
+    return new Intl.DateTimeFormat("en", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+export default function AdminTaxCredentialSystemsPage() {
   const [systems, setSystems] = useState<TaxCredentialSystem[]>([]);
-  const [credentials, setCredentials] = useState<ClientTaxCredential[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<ClientTaxCredential | null>(null);
+  const [editing, setEditing] = useState<TaxCredentialSystem | null>(null);
 
-  const activeSystems = useMemo(() => {
-    return systems
-      .filter((system) => system.is_active !== false)
-      .sort((a, b) => (a.display_order || 0) - (b.display_order || 0));
+  const sortedSystems = useMemo(() => {
+    return [...systems].sort(
+      (a, b) => (a.display_order || 0) - (b.display_order || 0),
+    );
   }, [systems]);
 
   const load = useCallback(async () => {
     setLoading(true);
 
     try {
-      const [systemResult, credentialResult] = await Promise.all([
-        api.get<unknown>("/tax-credential-systems?page_size=100"),
-        api.get<unknown>("/client/tax-credentials?page_size=100"),
-      ]);
-
-      setSystems(getItems<TaxCredentialSystem>(systemResult.data));
-      setCredentials(getItems<ClientTaxCredential>(credentialResult.data));
-    } catch (error) {
-      toast.error(
-        getSafeErrorMessage(error, "Failed to load tax credentials."),
+      const result = await api.get<unknown>(
+        "/admin/tax-credential-systems?page_size=100",
       );
+
+      setSystems(getItems<TaxCredentialSystem>(result.data));
+    } catch (error) {
+      toast.error(getSafeErrorMessage(error, "Failed to load tax systems."));
     } finally {
       setLoading(false);
     }
@@ -78,10 +94,6 @@ export default function ClientTaxCredentialsPage() {
 
   useEffect(() => {
     void load();
-
-    return () => {
-      setEditing(null);
-    };
   }, [load]);
 
   const openCreate = () => {
@@ -89,8 +101,8 @@ export default function ClientTaxCredentialsPage() {
     setModalOpen(true);
   };
 
-  const openEdit = (credential: ClientTaxCredential) => {
-    setEditing(credential);
+  const openEdit = (system: TaxCredentialSystem) => {
+    setEditing(system);
     setModalOpen(true);
   };
 
@@ -99,67 +111,96 @@ export default function ClientTaxCredentialsPage() {
     setModalOpen(false);
   };
 
-  const saveCredential = async (
-    payload: CredentialCreatePayload | CredentialUpdatePayload,
-  ) => {
+  const saveSystem = async (payload: TaxCredentialSystemPayload) => {
     setSaving(true);
 
     try {
       if (editing) {
         await api.put(
-          `/client/tax-credentials/detail?id=${encodeURIComponent(editing.id)}`,
+          `/admin/tax-credential-systems/detail?id=${encodeURIComponent(
+            editing.id,
+          )}`,
           payload,
         );
 
-        toast.success("Credential updated.");
+        toast.success("Tax system updated.");
       } else {
-        await api.post("/client/tax-credentials", payload);
-        toast.success("Credential saved.");
+        await api.post("/admin/tax-credential-systems", payload);
+        toast.success("Tax system created.");
       }
 
       closeModal();
       await load();
     } catch (error) {
-      toast.error(getSafeErrorMessage(error, "Failed to save credential."));
+      toast.error(getSafeErrorMessage(error, "Failed to save tax system."));
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteCredential = async (credential: ClientTaxCredential) => {
-  const confirmed = window.confirm(
-    `Delete credential for ${credential.system_name}?`,
-  );
+  const toggleStatus = async (system: TaxCredentialSystem) => {
+    try {
+      await api.patch(
+        `/admin/tax-credential-systems/status?id=${encodeURIComponent(
+          system.id,
+        )}`,
+        {
+          is_active: system.is_active === false,
+        },
+      );
 
-  if (!confirmed) return;
+      toast.success(
+        system.is_active === false
+          ? "Tax system activated."
+          : "Tax system deactivated.",
+      );
 
-  try {
-    await api.request(
-      `/client/tax-credentials/detail?id=${encodeURIComponent(credential.id)}`,
-      {
-        method: "DELETE",
-      },
+      await load();
+    } catch (error) {
+      toast.error(getSafeErrorMessage(error, "Failed to update status."));
+    }
+  };
+
+  const deleteSystem = async (system: TaxCredentialSystem) => {
+    const confirmed = window.confirm(
+      `Delete "${system.system_name}"? This action cannot be undone.`,
     );
 
-    toast.success("Credential deleted.");
-    await load();
-  } catch (error) {
-    toast.error(getSafeErrorMessage(error, "Failed to delete credential."));
-  }
-};
+    if (!confirmed) return;
+
+    try {
+      await api.request(
+        `/admin/tax-credential-systems/detail?id=${encodeURIComponent(
+          system.id,
+        )}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      toast.success("Tax system deleted.");
+      await load();
+    } catch (error) {
+      toast.error(getSafeErrorMessage(error, "Failed to delete tax system."));
+    }
+  };
 
   return (
     <div>
       <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-navy">Tax Credentials</h1>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
+            Tax Credentials
+          </p>
+
+          <h1 className="text-2xl font-bold text-navy">Tax Systems</h1>
+
           <p className="mt-1 text-sm text-gray-400">
-            Securely save login details for tax and Rwanda Revenue related
-            systems.
+            Manage external Rwanda Revenue and tax portals clients can select.
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => void load()}
@@ -175,64 +216,120 @@ export default function ClientTaxCredentialsPage() {
             className="inline-flex items-center gap-2 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-teal"
           >
             <Plus size={15} />
-            Add Credential
+            Add System
           </button>
         </div>
       </div>
 
-      <div className="mb-6 rounded-xl border border-teal/20 bg-teal/5 p-4">
-        <div className="flex gap-3">
-          <ShieldCheck size={20} className="mt-0.5 shrink-0 text-teal" />
-          <p className="text-sm leading-relaxed text-gray-600">
-            Your password is stored securely and encrypted on the server. It is
-            only revealed to authorized staff when needed for your service.
-          </p>
+      <div className="overflow-hidden rounded-xl border border-gray-100 bg-white">
+        <div className="border-b border-gray-100 px-5 py-4">
+          <h2 className="font-bold text-navy">External Tax Systems</h2>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-navy border-t-transparent" />
-        </div>
-      ) : credentials.length === 0 ? (
-        <div className="rounded-xl border border-gray-100 bg-white p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-lightgray">
-            <KeyRound size={28} className="text-gray-300" />
+        {loading ? (
+          <div className="flex justify-center py-16">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-navy border-t-transparent" />
           </div>
-          <h3 className="font-semibold text-navy">No tax credentials yet</h3>
-          <p className="mt-1 text-sm text-gray-400">
-            Add credentials for RRA and tax systems created by admin.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
-          {credentials.map((credential) => (
-            <CredentialCard
-              key={credential.id}
-              credential={credential}
-              revealEndpoint="/client/tax-credentials/reveal"
-              canEdit
-              canDelete
-              onEdit={openEdit}
-              onDelete={deleteCredential}
-            />
-          ))}
-        </div>
-      )}
+        ) : sortedSystems.length === 0 ? (
+          <div className="p-12 text-center">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-lightgray">
+              <KeyRound size={28} className="text-gray-300" />
+            </div>
+
+            <h3 className="font-semibold text-navy">No systems yet</h3>
+
+            <p className="mt-1 text-sm text-gray-400">
+              Add RRA and tax-related systems clients can use.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-50">
+            {sortedSystems.map((system) => (
+              <div
+                key={system.id}
+                className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-center"
+              >
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gold/15 text-navy">
+                    <KeyRound size={18} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-navy">
+                        {system.system_name}
+                      </h3>
+
+                      <StatusBadge active={system.is_active !== false} />
+                    </div>
+
+                    <a
+                      href={system.login_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-teal hover:underline"
+                    >
+                      {system.login_url}
+                      <ExternalLink size={12} />
+                    </a>
+
+                    {system.description ? (
+                      <p className="mt-1 text-sm text-gray-500">
+                        {system.description}
+                      </p>
+                    ) : null}
+
+                    <p className="mt-1 text-xs text-gray-400">
+                      Order: {system.display_order || 0} · Created:{" "}
+                      {formatDate(system.created_at)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void toggleStatus(system)}
+                    className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-lightgray"
+                  >
+                    {system.is_active === false ? "Activate" : "Deactivate"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => openEdit(system)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-lightgray"
+                  >
+                    <Edit3 size={13} />
+                    Edit
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => void deleteSystem(system)}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-red-100 px-3 py-2 text-xs font-semibold text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={13} />
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       {modalOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-xl">
             <h2 className="mb-4 text-lg font-bold text-navy">
-              {editing ? "Edit Credential" : "Add Credential"}
+              {editing ? "Edit Tax System" : "Add Tax System"}
             </h2>
 
-            <CredentialForm
-              mode={editing ? "update" : "create"}
-              systems={activeSystems}
+            <SystemForm
               initialValue={editing}
               submitting={saving}
-              onSubmit={saveCredential}
+              onSubmit={saveSystem}
               onCancel={closeModal}
             />
           </div>

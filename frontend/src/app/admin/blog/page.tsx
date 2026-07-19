@@ -327,28 +327,26 @@ export default function AdminBlogPage() {
   };
 
   const handleDelete = async (post: BlogPost) => {
-    const confirmed = window.confirm(
-      `Delete "${post.title}"? This action cannot be undone.`,
+  const confirmed = window.confirm(
+    `Delete "${post.title}"? This action cannot be undone.`,
+  );
+
+  if (!confirmed) return;
+
+  try {
+    await api.request(
+      `/admin/blog/detail?id=${encodeURIComponent(post.id)}`,
+      {
+        method: "DELETE",
+      },
     );
 
-    if (!confirmed) return;
-
-    setDeleting(post.id);
-
-    try {
-      await api.delete(
-        `/admin/blog/detail?id=${encodeURIComponent(post.id)}`,
-      );
-
-      toast.success("Blog post deleted.");
-      await load();
-    } catch (error) {
-      toast.error(getSafeErrorMessage(error, "Failed to delete blog post."));
-    } finally {
-      setDeleting(null);
-    }
-  };
-
+    toast.success("Blog post deleted successfully.");
+    await load();
+  } catch (error) {
+    toast.error(getSafeErrorMessage(error, "Failed to delete blog post."));
+  }
+};
   return (
     <div className="max-w-5xl">
       <div className="mb-6 flex items-center justify-between gap-4">
