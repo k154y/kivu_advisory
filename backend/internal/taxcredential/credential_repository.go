@@ -7,6 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	notificationpkg "github.com/kyves/kivu-advisory/backend/internal/notification"
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 )
 
@@ -30,6 +31,7 @@ const clientCredentialSelectColumns = `
 
 type CredentialRepository interface {
 	FindClientIDByUserID(ctx context.Context, userID string) (string, error)
+	FindClientRecipientByClientID(ctx context.Context, clientID string) (*notificationpkg.Recipient, error)
 	AccountantCanAccessClient(ctx context.Context, accountantUserID string, clientID string) (bool, error)
 
 	CreateCredential(ctx context.Context, input CreateClientCredentialInput, encryptedPassword string) (*ClientTaxCredential, error)
@@ -73,6 +75,46 @@ func (r *PostgresCredentialRepository) FindClientIDByUserID(ctx context.Context,
 	}
 
 	return clientID, nil
+}
+
+func (r *PostgresCredentialRepository) FindClientRecipientByClientID(ctx context.Context, clientID string) (*notificationpkg.Recipient, error) {
+	if r == nil || r.pool == nil {
+		return nil, apperrors.Internal("client tax credential repository is not initialized")
+	}
+
+	clientID = strings.TrimSpace(clientID)
+	if clientID == "" {
+		return nil, apperrors.InvalidInput("client id is required")
+	}
+
+	var recipient notificationpkg.Recipient
+
+	err := r.pool.QueryRow(ctx, `
+		SELECT
+			u.id,
+			COALESCE(u.full_name, ''),
+			COALESCE(u.email, ''),
+			COALESCE(u.phone, ''),
+			COALESCE(u.role, '')
+		FROM clients c
+		INNER JOIN users u
+			ON u.id = c.user_id
+		WHERE c.id = $1
+		LIMIT 1
+	`, clientID).Scan(
+		&recipient.UserID,
+		&recipient.FullName,
+		&recipient.Email,
+		&recipient.Phone,
+		&recipient.Role,
+	)
+	if err != nil {
+		return nil, mapPostgresError(err, "client recipient not found", "client credential already exists")
+	}
+
+	normalizedRecipient := recipient.Normalize()
+
+	return &normalizedRecipient, nil
 }
 
 func (r *PostgresCredentialRepository) AccountantCanAccessClient(ctx context.Context, accountantUserID string, clientID string) (bool, error) {

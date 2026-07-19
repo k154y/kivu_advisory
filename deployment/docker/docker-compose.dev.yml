@@ -28,7 +28,7 @@ services:
     restart: unless-stopped
     depends_on:
       postgres:
-        condition: service_healthyd
+        condition: service_healthy
     ports:
       - "3000:3000"
       - "8080:8080"

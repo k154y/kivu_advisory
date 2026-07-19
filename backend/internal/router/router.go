@@ -115,8 +115,8 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		notificationRepository,
 		notificationDeliveryRepository,
 		notificationRecipientRepository,
-		notification.NewNoopEmailSender(),
-		notification.NewNoopSMSSender(),
+		notification.NewEmailSenderFromEnv(),
+		notification.NewSMSSenderFromEnv(),
 	)
 
 	blogRepository := blog.NewPostgresRepository(options.DatabasePool)
@@ -148,7 +148,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		taxCredentialEncryptor,
 	)
 
-	
+	taxCredentialService.SetNotificationService(notificationService)
 
 	bootstrapCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -458,7 +458,6 @@ func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVeri
 	mux.HandleFunc(api+"/admin", notImplemented("admin route is not implemented yet"))
 	mux.HandleFunc(api+"/client", notImplemented("client route is not implemented yet"))
 	mux.HandleFunc(api+"/accountant", notImplemented("accountant route is not implemented yet"))
-
 
 }
 

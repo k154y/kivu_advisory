@@ -9,9 +9,10 @@ import (
 )
 
 type Service struct {
-	systemRepo     SystemRepository
-	credentialRepo CredentialRepository
-	encryptor       Encryptor
+	systemRepo          SystemRepository
+	credentialRepo      CredentialRepository
+	encryptor           Encryptor
+	notificationService NotificationService
 }
 
 func NewService(
@@ -22,7 +23,7 @@ func NewService(
 	return &Service{
 		systemRepo:     systemRepo,
 		credentialRepo: credentialRepo,
-		encryptor:       encryptor,
+		encryptor:      encryptor,
 	}
 }
 
@@ -296,6 +297,8 @@ func (s *Service) UpdateClientCredential(ctx context.Context, clientUserID strin
 		return nil, err
 	}
 
+	s.notifyCredentialUpdated(ctx, item, clientUserID, "client")
+
 	publicItem := item.Public()
 
 	return &publicItem, nil
@@ -347,7 +350,7 @@ func (s *Service) RevealClientCredential(ctx context.Context, clientUserID strin
 		return nil, forbidden("you do not have permission to reveal this credential")
 	}
 
-	return s.revealCredential(ctx, item, clientUserID)
+	return s.revealCredential(ctx, item, clientUserID, "client")
 }
 
 /*
@@ -395,7 +398,7 @@ func (s *Service) RevealAdminCredential(ctx context.Context, adminUserID string,
 		return nil, err
 	}
 
-	return s.revealCredential(ctx, item, adminUserID)
+	return s.revealCredential(ctx, item, adminUserID, "admin")
 }
 
 func (s *Service) DeleteAdminCredential(ctx context.Context, id string) error {
@@ -425,6 +428,8 @@ func (s *Service) UpdateAdminCredentialStatus(ctx context.Context, id string, is
 	if err != nil {
 		return nil, err
 	}
+
+	s.notifyCredentialUpdated(ctx, item, "", "admin")
 
 	adminItem := item.Admin()
 
@@ -523,7 +528,7 @@ func (s *Service) RevealAccountantCredential(ctx context.Context, accountantUser
 		return nil, forbidden("you do not have permission to reveal this credential")
 	}
 
-	return s.revealCredential(ctx, item, accountantUserID)
+	return s.revealCredential(ctx, item, accountantUserID, "accountant")
 }
 
 /*
@@ -543,7 +548,7 @@ func (s *Service) clientIDFromUserID(ctx context.Context, clientUserID string) (
 	return s.credentialRepo.FindClientIDByUserID(ctx, clientUserID)
 }
 
-func (s *Service) revealCredential(ctx context.Context, item *ClientTaxCredential, revealedByUserID string) (*RevealedCredential, error) {
+func (s *Service) revealCredential(ctx context.Context, item *ClientTaxCredential, revealedByUserID string, actorRole string) (*RevealedCredential, error) {
 	if s == nil || s.credentialRepo == nil || s.encryptor == nil {
 		return nil, apperrors.Internal("tax credential service is not initialized")
 	}
@@ -560,6 +565,8 @@ func (s *Service) revealCredential(ctx context.Context, item *ClientTaxCredentia
 	if err := s.credentialRepo.MarkCredentialRevealed(ctx, item.ID, revealedByUserID); err != nil {
 		return nil, err
 	}
+
+	s.notifyCredentialRevealed(ctx, item, revealedByUserID, actorRole)
 
 	return &RevealedCredential{
 		ID:         item.ID,
