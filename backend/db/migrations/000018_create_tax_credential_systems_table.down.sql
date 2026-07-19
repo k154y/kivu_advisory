@@ -1,1 +1,0 @@
-DROP TABLE IF EXISTS tax_credential_systems;

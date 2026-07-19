@@ -1,1 +1,0 @@
-DROP TABLE IF EXISTS client_tax_credentials;

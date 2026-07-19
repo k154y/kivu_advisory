@@ -1,2 +1,0 @@
-This is a client uploaded tax document.
-The client should be able to upload, list, and download this file.

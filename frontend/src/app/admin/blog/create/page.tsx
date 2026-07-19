@@ -1,7 +1,10 @@
-"use client";
-
-import { BlogPostForm } from "@/components/admin/blog-post-form";
-
-export default function AdminBlogCreatePage() {
-  return <BlogPostForm mode="create" />;
+export default function Page() {
+  return (
+    <main className="page">
+      <div className="container">
+        <h1>Create Blog Post</h1>
+        <p>This page will be developed for the accounting platform.</p>
+      </div>
+    </main>
+  );
 }

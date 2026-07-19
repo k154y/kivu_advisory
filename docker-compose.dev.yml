@@ -1,0 +1,45 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: .devcontainer/Dockerfile
+   
+    volumes:
+      - .:/workspace:cached
+    command: sleep infinity
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/accounting_platform?sslmode=disable
+      FRONTEND_URL: http://localhost:3000
+    networks:
+      - accounting-network
+
+  postgres:
+    image: postgres:16
+    
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: accounting_platform
+    ports:
+      - "5432:5432"
+    volumes:
+      - accounting_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d accounting_platform"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - accounting-network
+
+volumes:
+  accounting_postgres_data:
+
+networks:
+  accounting-network:
+    driver: bridge

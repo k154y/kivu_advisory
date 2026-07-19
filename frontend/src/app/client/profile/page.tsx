@@ -1,18 +1,10 @@
-"use client";
-
-import { ProfileForm } from "@/components/forms/profile-form";
-
-export default function ClientProfilePage() {
+export default function Page() {
   return (
-    <div className="max-w-3xl">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-navy">My Profile</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          Update your personal information and contact details.
-        </p>
+    <main className="page">
+      <div className="container">
+        <h1>Client Profile</h1>
+        <p>This page will be developed for the accounting platform.</p>
       </div>
-
-      <ProfileForm accentColor="bg-teal" />
-    </div>
+    </main>
   );
 }

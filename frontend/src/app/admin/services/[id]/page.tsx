@@ -1,7 +1,10 @@
-import { redirect } from "next/navigation";
-
-import { routes } from "@/lib/routes";
-
-export default function AdminServiceDetailPage() {
-  redirect(routes.admin.services);
+export default function Page() {
+  return (
+    <main className="page">
+      <div className="container">
+        <h1>Service Management Details</h1>
+        <p>This page will be developed for the accounting platform.</p>
+      </div>
+    </main>
+  );
 }
