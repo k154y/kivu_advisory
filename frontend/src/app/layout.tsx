@@ -1,26 +1,28 @@
-import "../styles/globals.css";
 import type { Metadata } from "next";
-import Header from "@/components/common/Header";
-import Footer from "@/components/common/Footer";
-import WhatsAppButton from "@/components/common/WhatsAppButton";
+import { Toaster } from "sonner";
+
+import "@/styles/globals.css";
+import { AuthProvider } from "@/providers/auth-provider";
 
 export const metadata: Metadata = {
-  title: "Professional Accounting Services",
-  description: "Accounting, tax, audit, payroll and business advisory services."
+  title: {
+    default: "Kivu Advisory",
+    template: "%s | Kivu Advisory",
+  },
+  description:
+    "Professional accounting, tax, audit, compliance, and business advisory services.",
 };
 
-export default function RootLayout({
-  children
-}: Readonly<{
+type RootLayoutProps = {
   children: React.ReactNode;
-}>) {
+};
+
+export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="en">
-      <body>
-        <Header />
-        {children}
-        <WhatsAppButton />
-        <Footer />
+      <body className="min-h-screen bg-white text-slate-950 antialiased">
+        <AuthProvider>{children}</AuthProvider>
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

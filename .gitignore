@@ -18,3 +18,26 @@ backend/tmp/
 .DS_Store
 
 *.log
+
+# =========================================================
+# Deployment real environment files
+# Never commit real server secrets
+# =========================================================
+deployment/env/backend.env
+deployment/env/frontend.env
+deployment/env/production.env
+deployment/env/*.local
+
+# Go local/generated files
+backend/.go1.26/
+backend/server
+
+# Real environment files
+deployment/env/*.env
+!deployment/env/*.env.example
+
+# Environment secrets
+
+# Environment secrets
+deployment/env/backend.staging.env
+deployment/env/backend.production.env
