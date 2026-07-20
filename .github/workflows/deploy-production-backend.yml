@@ -1,0 +1,21 @@
+name: Deploy Production Backend
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "scripts/**"
+      - "deployment/**"
+      - ".github/workflows/deploy-production-backend.yml"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy backend to RackNerd production
+    runs-on: self-hosted
+
+    steps:
+      - name: Deploy production backend
+        run: /opt/kivu_advisory_production/deploy-production.sh
