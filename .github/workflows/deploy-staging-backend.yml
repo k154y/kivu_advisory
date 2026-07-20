@@ -1,0 +1,22 @@
+name: Deploy Staging Backend
+
+on:
+  push:
+    branches:
+      - devs
+
+jobs:
+  deploy:
+    name: Deploy backend to RackNerd staging
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy through SSH
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_PORT }}
+          script: |
+            /opt/kivu_advisory/deploy-staging.sh
