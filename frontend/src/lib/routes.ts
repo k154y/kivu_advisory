@@ -70,6 +70,7 @@ export const routes = {
     requestDetail: (id: string) => `/client/requests/${id}`,
     documents: "/client/documents",
     messages: "/client/messages",
+    linkRequest: "/client/requests/link",
   },
 accountant: {
   dashboard: "/accountant/dashboard",

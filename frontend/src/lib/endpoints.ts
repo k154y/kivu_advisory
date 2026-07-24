@@ -33,6 +33,7 @@ export const endpoints = {
     serviceRequests: "/client/service-requests",
     serviceRequestDetail: (id: string) =>
       withQuery("/client/service-requests/detail", { id }),
+    claimServiceRequest: "/client/service-requests/claim",
   },
 
 public: {

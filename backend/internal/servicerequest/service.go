@@ -17,6 +17,50 @@ func NewService(repo Repository) *Service {
 	}
 }
 
+func (s *Service) ClaimVisitorRequestByReference(
+	ctx context.Context,
+	clientID string,
+	referenceNumber string,
+	requesterEmail string,
+	requesterPhone string,
+) (*PublicServiceRequest, error) {
+	if s == nil || s.repo == nil {
+		return nil, apperrors.Internal("service request service is not initialized")
+	}
+
+	clientID = strings.TrimSpace(clientID)
+	referenceNumber = strings.TrimSpace(referenceNumber)
+	requesterEmail = strings.ToLower(strings.TrimSpace(requesterEmail))
+	requesterPhone = strings.TrimSpace(requesterPhone)
+
+	if clientID == "" {
+		return nil, apperrors.InvalidInput("client id is required")
+	}
+
+	if referenceNumber == "" {
+		return nil, apperrors.InvalidInput("reference number is required")
+	}
+
+	if requesterEmail == "" && requesterPhone == "" {
+		return nil, apperrors.InvalidInput("requester email or requester phone is required")
+	}
+
+	claimedRequest, err := s.repo.ClaimVisitorRequestByReference(
+		ctx,
+		clientID,
+		referenceNumber,
+		requesterEmail,
+		requesterPhone,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	publicRequest := claimedRequest.Public()
+
+	return &publicRequest, nil
+}
+
 func (s *Service) CreateVisitorRequest(ctx context.Context, input CreateServiceRequestInput) (*PublicServiceRequest, error) {
 	if s == nil || s.repo == nil {
 		return nil, apperrors.Internal("service request service is not initialized")
@@ -250,6 +294,27 @@ func (s *Service) DeleteAdmin(ctx context.Context, id string) error {
 
 	return s.repo.Delete(ctx, id)
 }
+
+func (s *Service) ClaimVisitorRequestsByEmail(ctx context.Context, clientID string, email string) (int64, error) {
+	if s == nil || s.repo == nil {
+		return 0, apperrors.Internal("service request service is not initialized")
+	}
+
+	clientID = strings.TrimSpace(clientID)
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	if clientID == "" {
+		return 0, apperrors.InvalidInput("client id is required")
+	}
+
+	if email == "" {
+		return 0, nil
+	}
+
+	return s.repo.ClaimVisitorRequestsByEmail(ctx, clientID, email)
+}
+
+
 
 func publicRequestsForClient(requests []ServiceRequest) []PublicServiceRequest {
 	result := make([]PublicServiceRequest, 0, len(requests))

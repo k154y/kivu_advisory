@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	clientpkg "github.com/kyves/kivu-advisory/backend/internal/client"
@@ -22,11 +23,16 @@ type ClientService interface {
 	CreateForUser(ctx context.Context, userID string, companyName string) (*clientpkg.PublicClient, error)
 }
 
+type VisitorRequestClaimer interface {
+	ClaimVisitorRequestsByEmail(ctx context.Context, clientID string, email string) (int64, error)
+}
+
 type Service struct {
-	users             UserService
-	clients           ClientService
-	tokenManager      *TokenManager
-	passwordMinLength int
+	users                 UserService
+	clients               ClientService
+	tokenManager          *TokenManager
+	passwordMinLength     int
+	visitorRequestClaimer VisitorRequestClaimer
 }
 
 func NewService(users UserService, tokenManager *TokenManager, passwordMinLength int) *Service {
@@ -49,6 +55,14 @@ func (s *Service) SetClientService(clients ClientService) {
 	s.clients = clients
 }
 
+func (s *Service) SetVisitorRequestClaimer(claimer VisitorRequestClaimer) {
+	if s == nil {
+		return
+	}
+
+	s.visitorRequestClaimer = claimer
+}
+
 func (s *Service) Login(ctx context.Context, request LoginRequest) (TokenResponse, error) {
 	if s == nil || s.users == nil || s.tokenManager == nil {
 		return TokenResponse{}, apperrors.Internal("auth service is not initialized")
@@ -63,12 +77,27 @@ func (s *Service) Login(ctx context.Context, request LoginRequest) (TokenRespons
 		return TokenResponse{}, err
 	}
 
+	// Defensive repair:
+	// If an older registration created a client user without a client profile,
+	// login will create the missing client profile before the user reaches client pages.
+	if NormalizeRole(foundUser.Role) == RoleClient && s.clients != nil {
+		if _, err := s.clients.CreateForUser(ctx, foundUser.ID, foundUser.CompanyName); err != nil {
+			// Do not block login if the client profile already exists.
+			// CreateForUser should ideally handle duplicate user_id safely.
+			log.Printf("client profile ensure during login failed: user_id=%s email=%s error=%v", foundUser.ID, foundUser.Email, err)
+		}
+	}
+
 	return s.tokenManager.GenerateTokenPair(authUserFromUser(foundUser))
 }
 
 func (s *Service) RegisterClient(ctx context.Context, request RegisterClientRequest) (TokenResponse, error) {
 	if s == nil || s.users == nil || s.tokenManager == nil {
 		return TokenResponse{}, apperrors.Internal("auth service is not initialized")
+	}
+
+	if s.clients == nil {
+		return TokenResponse{}, apperrors.Internal("client service is not initialized")
 	}
 
 	if validationErrors := request.Validate(s.passwordMinLength); len(validationErrors) > 0 {
@@ -88,9 +117,17 @@ func (s *Service) RegisterClient(ctx context.Context, request RegisterClientRequ
 		return TokenResponse{}, err
 	}
 
-	if s.clients != nil {
-		_, err := s.clients.CreateForUser(ctx, createdUser.ID, createdUser.CompanyName)
-		if err != nil {
+	// This must happen immediately after user creation.
+	// Client pages depend on clients.id, not only users.id.
+	createdClient, err := s.clients.CreateForUser(ctx, createdUser.ID, createdUser.CompanyName)
+	if err != nil {
+		return TokenResponse{}, err
+	}
+
+	// Claiming old visitor requests is important, but it must never happen
+	// before the client profile exists.
+	if s.visitorRequestClaimer != nil && createdClient != nil {
+		if _, err := s.visitorRequestClaimer.ClaimVisitorRequestsByEmail(ctx, createdClient.ID, createdUser.Email); err != nil {
 			return TokenResponse{}, err
 		}
 	}

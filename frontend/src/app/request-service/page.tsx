@@ -3,7 +3,7 @@
 import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowRight, CheckCircle, Lock, Upload } from "lucide-react";
+import { ArrowRight, CheckCircle, Copy, Lock, Upload } from "lucide-react";
 import { toast } from "sonner";
 
 import { PublicLayout } from "@/components/layout/public-layout";
@@ -146,6 +146,13 @@ function RequestForm() {
     });
   };
 
+  const copyReferenceNumber = async () => {
+    if (!referenceNumber) return;
+
+    await navigator.clipboard.writeText(referenceNumber);
+    toast.success("Reference number copied.");
+  };
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -176,31 +183,62 @@ function RequestForm() {
         SERVICES.find((service) => service.value === form.service_type)?.label ||
         "Service request";
 
-      const requesterPhone = form.phone.trim() || form.whatsapp.trim();
+      const requesterName = form.full_name.trim();
+      const requesterEmail = form.email.trim();
+      const requesterPhone = (form.phone.trim() || form.whatsapp.trim()).replace(
+        /\s+/g,
+        "",
+      );
+      const requesterCompany = form.company_name.trim();
+
+      const payload: Record<string, string> = {
+        requester_name: requesterName,
+        title: `Request for ${selectedService}`,
+        description: buildRequestDescription({
+          ...form,
+          full_name: requesterName,
+          email: requesterEmail,
+          phone: form.phone.trim(),
+          whatsapp: form.whatsapp.trim(),
+          company_name: requesterCompany,
+          location: form.location.trim(),
+          description: form.description.trim(),
+        }),
+        priority: form.urgency,
+        preferred_contact_method: form.contact_method,
+      };
+
+      if (requesterEmail) {
+        payload.requester_email = requesterEmail;
+      }
+
+      if (requesterPhone) {
+        payload.requester_phone = requesterPhone;
+      }
+
+      if (requesterCompany) {
+        payload.requester_company = requesterCompany;
+      }
 
       const response = await fetch(`${apiBaseUrl}/service-requests`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          requester_name: form.full_name,
-          requester_email: form.email,
-          requester_phone: requesterPhone,
-          requester_company: form.company_name,
-          title: `Request for ${selectedService}`,
-          description: buildRequestDescription(form),
-          priority: form.urgency,
-          preferred_contact_method: form.contact_method,
-          source: "website",
-        }),
+        body: JSON.stringify(payload),
       });
 
       const result = await response.json().catch(() => null);
 
       if (!response.ok || result?.success === false) {
+        const validationDetails =
+          result?.error?.details && typeof result.error.details === "object"
+            ? Object.values(result.error.details).join(", ")
+            : "";
+
         throw new Error(
-          result?.error?.message ||
+          validationDetails ||
+            result?.error?.message ||
             result?.message ||
             "Failed to submit request.",
         );
@@ -244,9 +282,32 @@ function RequestForm() {
           </p>
 
           {referenceNumber ? (
-            <p className="mb-6 rounded-lg bg-white px-4 py-3 text-sm font-semibold text-navy">
-              Reference number: {referenceNumber}
-            </p>
+            <div className="mb-6 rounded-xl border border-gray-100 bg-white p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-gray-400">
+                Reference Number
+              </p>
+
+              <div className="mt-2 flex items-center justify-center gap-3">
+                <p className="text-lg font-bold text-navy">
+                  {referenceNumber}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={copyReferenceNumber}
+                  className="inline-flex items-center gap-1 rounded-lg border border-gray-200 px-2.5 py-1.5 text-xs font-semibold text-gray-600 hover:bg-lightgray"
+                >
+                  <Copy size={13} />
+                  Copy
+                </button>
+              </div>
+
+              <p className="mt-3 text-sm text-gray-500">
+                Please keep this reference number. You can use it later when
+                contacting our team or linking this request to your client
+                account.
+              </p>
+            </div>
           ) : null}
 
           <div className="mb-6 rounded-xl border border-navy/10 bg-navy-50 p-5 text-left">
@@ -322,6 +383,7 @@ function RequestForm() {
         <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
           <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <Upload size={16} className="mt-0.5 shrink-0 text-amber-600" />
+
             <div>
               <p className="text-sm font-semibold text-amber-800">
                 Document uploads require an account
@@ -349,6 +411,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Full Name *
                   </label>
+
                   <input
                     type="text"
                     required
@@ -365,6 +428,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Company / Organization
                   </label>
+
                   <input
                     type="text"
                     value={form.company_name}
@@ -382,6 +446,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Phone Number
                   </label>
+
                   <input
                     type="tel"
                     value={form.phone}
@@ -395,6 +460,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     WhatsApp Number
                   </label>
+
                   <input
                     type="tel"
                     value={form.whatsapp}
@@ -410,6 +476,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Email Address
                   </label>
+
                   <input
                     type="email"
                     value={form.email}
@@ -423,6 +490,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Location / District
                   </label>
+
                   <input
                     type="text"
                     value={form.location}
@@ -437,6 +505,7 @@ function RequestForm() {
                 <label className="mb-1.5 block text-sm font-medium text-charcoal">
                   Service Needed *
                 </label>
+
                 <select
                   required
                   value={form.service_type}
@@ -446,6 +515,7 @@ function RequestForm() {
                   className="w-full rounded-lg border border-gray-200 bg-white px-4 py-3 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
                 >
                   <option value="">Select a service...</option>
+
                   {SERVICES.map((service) => (
                     <option key={service.value} value={service.value}>
                       {service.label}
@@ -459,6 +529,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Urgency Level
                   </label>
+
                   <select
                     value={form.urgency}
                     onChange={(event) => update("urgency", event.target.value)}
@@ -476,6 +547,7 @@ function RequestForm() {
                   <label className="mb-1.5 block text-sm font-medium text-charcoal">
                     Preferred Contact Method
                   </label>
+
                   <select
                     value={form.contact_method}
                     onChange={(event) =>
@@ -496,6 +568,7 @@ function RequestForm() {
                 <label className="mb-1.5 block text-sm font-medium text-charcoal">
                   Description of Your Need *
                 </label>
+
                 <textarea
                   required
                   rows={5}

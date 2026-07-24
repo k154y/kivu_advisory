@@ -243,7 +243,7 @@ export default function AdminDashboardPage() {
           </button>
           <Link
             href="/admin/requests"
-            className="flex items-center gap-1.5 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal"
+            className="flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal"
           >
             <Plus size={13} />
             View Requests

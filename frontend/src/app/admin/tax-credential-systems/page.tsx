@@ -189,10 +189,7 @@ export default function AdminTaxCredentialSystemsPage() {
     <div>
       <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
-            Tax Credentials
-          </p>
-
+         
           <h1 className="text-2xl font-bold text-navy">Tax Systems</h1>
 
           <p className="mt-1 text-sm text-gray-400">

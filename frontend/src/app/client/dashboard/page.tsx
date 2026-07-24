@@ -9,6 +9,7 @@ import {
   ClipboardList,
   Clock3,
   Plus,
+  LinkIcon
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -283,6 +284,16 @@ export default function ClientDashboardPage() {
               <CalendarDays size={18} />
               Book Consultation
             </Link>
+
+            <Link
+                href={routes.client.linkRequest}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal/20 bg-teal/10 px-4 py-2.5 text-sm font-semibold text-teal hover:bg-teal hover:text-white"
+              >
+                <LinkIcon size={15} />
+                Link Existing Request
+              </Link>
+
+
           </div>
         </div>
       </section>
