@@ -34,6 +34,15 @@ type Assignment struct {
 	InternalNotes    string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+
+	ClientID         string
+	ReferenceNumber string
+	RequestTitle    string
+	RequestStatus   string
+	RequesterName   string
+	RequesterEmail  string
+	RequesterPhone  string
+	RequesterCompany string
 }
 
 type PublicAssignment struct {
@@ -50,6 +59,15 @@ type PublicAssignment struct {
 	InternalNotes    string     `json:"internal_notes,omitempty"`
 	CreatedAt        time.Time  `json:"created_at"`
 	UpdatedAt        time.Time  `json:"updated_at"`
+
+	ClientID         string `json:"client_id,omitempty"`
+	ReferenceNumber string `json:"reference_number,omitempty"`
+	RequestTitle    string `json:"request_title,omitempty"`
+	RequestStatus   string `json:"request_status,omitempty"`
+	RequesterName   string `json:"requester_name,omitempty"`
+	RequesterEmail  string `json:"requester_email,omitempty"`
+	RequesterPhone  string `json:"requester_phone,omitempty"`
+	RequesterCompany string `json:"requester_company,omitempty"`
 }
 
 type CreateAssignmentInput struct {
@@ -101,6 +119,15 @@ func (a Assignment) Public() PublicAssignment {
 		InternalNotes:    a.InternalNotes,
 		CreatedAt:        a.CreatedAt,
 		UpdatedAt:        a.UpdatedAt,
+
+		ClientID:         a.ClientID,
+		ReferenceNumber: a.ReferenceNumber,
+		RequestTitle:    a.RequestTitle,
+		RequestStatus:   a.RequestStatus,
+		RequesterName:   a.RequesterName,
+		RequesterEmail:  a.RequesterEmail,
+		RequesterPhone:  a.RequesterPhone,
+		RequesterCompany: a.RequesterCompany,
 	}
 }
 

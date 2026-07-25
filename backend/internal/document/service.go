@@ -302,7 +302,7 @@ func (s *Service) canViewDocument(ctx context.Context, actor Actor, item *Docume
 
 	case roleAccountant:
 		switch visibility {
-		case VisibilityStaff:
+		case VisibilityClient, VisibilityStaff:
 			return nil
 		default:
 			return apperrors.Forbidden("you do not have permission to access this document")

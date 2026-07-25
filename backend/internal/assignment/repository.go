@@ -17,19 +17,27 @@ import (
 )
 
 const assignmentSelectColumns = `
-	id,
-	service_request_id,
-	accountant_user_id,
-	COALESCE(assigned_by_user_id, ''),
-	status,
-	priority,
-	due_date,
-	started_at,
-	completed_at,
-	COALESCE(notes, ''),
-	COALESCE(internal_notes, ''),
-	created_at,
-	updated_at
+	a.id,
+	a.service_request_id,
+	a.accountant_user_id,
+	COALESCE(a.assigned_by_user_id, ''),
+	a.status,
+	a.priority,
+	a.due_date,
+	a.started_at,
+	a.completed_at,
+	COALESCE(a.assignment_notes, ''),
+	COALESCE(a.internal_notes, ''),
+	a.created_at,
+	a.updated_at,
+	COALESCE(sr.client_id, ''),
+	sr.reference_number,
+	sr.title,
+	sr.status,
+	COALESCE(sr.requester_name, ''),
+	COALESCE(sr.requester_email, ''),
+	COALESCE(sr.requester_phone, ''),
+	COALESCE(sr.requester_company, '')
 `
 
 type Repository interface {
@@ -63,17 +71,22 @@ func (r *PostgresRepository) Create(ctx context.Context, input CreateAssignmentI
 	}
 
 	query := fmt.Sprintf(`
-		INSERT INTO assignments (
-			service_request_id,
-			accountant_user_id,
-			assigned_by_user_id,
-			priority,
-			due_date,
-			notes,
-			internal_notes
+		WITH created_assignment AS (
+			INSERT INTO assignments (
+				service_request_id,
+				accountant_user_id,
+				assigned_by_user_id,
+				priority,
+				due_date,
+				assignment_notes,
+				internal_notes
+			)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			RETURNING *
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		RETURNING %s
+		SELECT %s
+		FROM created_assignment a
+		JOIN service_requests sr ON sr.id = a.service_request_id
 	`, assignmentSelectColumns)
 
 	createdAssignment, err := scanAssignment(r.pool.QueryRow(
@@ -106,8 +119,9 @@ func (r *PostgresRepository) FindByID(ctx context.Context, id string) (*Assignme
 
 	query := fmt.Sprintf(`
 		SELECT %s
-		FROM assignments
-		WHERE id = $1
+		FROM assignments a
+		JOIN service_requests sr ON sr.id = a.service_request_id
+		WHERE a.id = $1
 		LIMIT 1
 	`, assignmentSelectColumns)
 
@@ -131,34 +145,35 @@ func (r *PostgresRepository) List(ctx context.Context, filter ListAssignmentsFil
 
 	if filter.ServiceRequestID != "" {
 		args = append(args, filter.ServiceRequestID)
-		conditions = append(conditions, fmt.Sprintf("service_request_id = $%d", len(args)))
+		conditions = append(conditions, fmt.Sprintf("a.service_request_id = $%d", len(args)))
 	}
 
 	if filter.AccountantUserID != "" {
 		args = append(args, filter.AccountantUserID)
-		conditions = append(conditions, fmt.Sprintf("accountant_user_id = $%d", len(args)))
+		conditions = append(conditions, fmt.Sprintf("a.accountant_user_id = $%d", len(args)))
 	}
 
 	if filter.AssignedByUserID != "" {
 		args = append(args, filter.AssignedByUserID)
-		conditions = append(conditions, fmt.Sprintf("assigned_by_user_id = $%d", len(args)))
+		conditions = append(conditions, fmt.Sprintf("a.assigned_by_user_id = $%d", len(args)))
 	}
 
 	if filter.Status != "" {
 		args = append(args, filter.Status)
-		conditions = append(conditions, fmt.Sprintf("status = $%d", len(args)))
+		conditions = append(conditions, fmt.Sprintf("a.status = $%d", len(args)))
 	}
 
 	if filter.Priority != "" {
 		args = append(args, filter.Priority)
-		conditions = append(conditions, fmt.Sprintf("priority = $%d", len(args)))
+		conditions = append(conditions, fmt.Sprintf("a.priority = $%d", len(args)))
 	}
 
 	whereClause := strings.Join(conditions, " AND ")
 
 	countQuery := fmt.Sprintf(`
 		SELECT COUNT(*)
-		FROM assignments
+		FROM assignments a
+		JOIN service_requests sr ON sr.id = a.service_request_id
 		WHERE %s
 	`, whereClause)
 
@@ -173,9 +188,10 @@ func (r *PostgresRepository) List(ctx context.Context, filter ListAssignmentsFil
 
 	listQuery := fmt.Sprintf(`
 		SELECT %s
-		FROM assignments
+		FROM assignments a
+		JOIN service_requests sr ON sr.id = a.service_request_id
 		WHERE %s
-		ORDER BY created_at DESC
+		ORDER BY a.created_at DESC
 		LIMIT $%d OFFSET $%d
 	`, assignmentSelectColumns, whereClause, limitPlaceholder, offsetPlaceholder)
 
@@ -220,16 +236,21 @@ func (r *PostgresRepository) Update(ctx context.Context, id string, input Update
 	}
 
 	query := fmt.Sprintf(`
-		UPDATE assignments
-		SET
-			accountant_user_id = $1,
-			priority = $2,
-			due_date = $3,
-			notes = $4,
-			internal_notes = $5,
-			updated_at = NOW()
-		WHERE id = $6
-		RETURNING %s
+		WITH updated_assignment AS (
+			UPDATE assignments
+			SET
+				accountant_user_id = $1,
+				priority = $2,
+				due_date = $3,
+				assignment_notes = $4,
+				internal_notes = $5,
+				updated_at = NOW()
+			WHERE id = $6
+			RETURNING *
+		)
+		SELECT %s
+		FROM updated_assignment a
+		JOIN service_requests sr ON sr.id = a.service_request_id
 	`, assignmentSelectColumns)
 
 	updatedAssignment, err := scanAssignment(r.pool.QueryRow(
@@ -268,23 +289,28 @@ func (r *PostgresRepository) UpdateStatus(ctx context.Context, id string, input 
 	}
 
 	query := fmt.Sprintf(`
-		UPDATE assignments
-		SET
-			status = $1,
-			notes = COALESCE(NULLIF($2, ''), notes),
-			internal_notes = COALESCE(NULLIF($3, ''), internal_notes),
-			started_at = CASE
-				WHEN $1 IN ('accepted', 'in_progress') AND started_at IS NULL THEN NOW()
-				ELSE started_at
-			END,
-			completed_at = CASE
-				WHEN $1 = 'completed' THEN NOW()
-				WHEN $1 <> 'completed' THEN NULL
-				ELSE completed_at
-			END,
-			updated_at = NOW()
-		WHERE id = $4
-		RETURNING %s
+		WITH updated_assignment AS (
+			UPDATE assignments
+			SET
+				status = $1,
+				assignment_notes = COALESCE(NULLIF($2, ''), assignment_notes),
+				internal_notes = COALESCE(NULLIF($3, ''), internal_notes),
+				started_at = CASE
+					WHEN $1 IN ('accepted', 'in_progress') AND started_at IS NULL THEN NOW()
+					ELSE started_at
+				END,
+				completed_at = CASE
+					WHEN $1 = 'completed' THEN NOW()
+					WHEN $1 <> 'completed' THEN NULL
+					ELSE completed_at
+				END,
+				updated_at = NOW()
+			WHERE id = $4
+			RETURNING *
+		)
+		SELECT %s
+		FROM updated_assignment a
+		JOIN service_requests sr ON sr.id = a.service_request_id
 	`, assignmentSelectColumns)
 
 	updatedAssignment, err := scanAssignment(r.pool.QueryRow(
@@ -351,6 +377,14 @@ func scanAssignment(row rowScanner) (*Assignment, error) {
 		&item.InternalNotes,
 		&item.CreatedAt,
 		&item.UpdatedAt,
+		&item.ClientID,
+		&item.ReferenceNumber,
+		&item.RequestTitle,
+		&item.RequestStatus,
+		&item.RequesterName,
+		&item.RequesterEmail,
+		&item.RequesterPhone,
+		&item.RequesterCompany,
 	)
 	if err != nil {
 		return nil, err

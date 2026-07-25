@@ -199,6 +199,20 @@ public: {
       withQuery("/accountant/assignments/status", { id }),
   },
 
+    accountantTaxCredentials: {
+    list: (clientId: string) =>
+      withQuery("/accountant/tax-credentials", {
+        client_id: clientId,
+        page_size: 100,
+      }),
+
+    detail: (id: string) =>
+      withQuery("/accountant/tax-credentials/detail", { id }),
+
+    reveal: (id: string) =>
+      withQuery("/accountant/tax-credentials/reveal", { id }),
+  },
+
   documents: {
     list: (params?: {
       service_request_id?: string;

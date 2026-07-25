@@ -6,7 +6,9 @@ import {
   ArrowRight,
   CalendarClock,
   FileText,
+  FolderOpen,
   LinkIcon,
+  MessageSquare,
   RefreshCcw,
   Search,
 } from "lucide-react";
@@ -120,6 +122,30 @@ function priorityClass(priority?: string) {
   }
 }
 
+function buildMessageHref(request: ServiceRequest) {
+  const params = new URLSearchParams();
+
+  params.set("service_request_id", request.id);
+
+  if (request.reference_number) {
+    params.set("reference", request.reference_number);
+  }
+
+  return `${routes.client.messages}?${params.toString()}`;
+}
+
+function buildDocumentsHref(request: ServiceRequest) {
+  const params = new URLSearchParams();
+
+  params.set("service_request_id", request.id);
+
+  if (request.reference_number) {
+    params.set("reference", request.reference_number);
+  }
+
+  return `${routes.client.documents}?${params.toString()}`;
+}
+
 export default function ClientRequestsPage() {
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,9 +219,8 @@ export default function ClientRequestsPage() {
             </h1>
 
             <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Track your requests, reference numbers, statuses, and deadlines.
-              Previous requests submitted with this email are linked
-              automatically.
+              Track your requests, messages, documents, statuses, and deadlines
+              by request reference number.
             </p>
           </div>
 
@@ -258,9 +283,8 @@ export default function ClientRequestsPage() {
           <h2 className="font-semibold text-navy">No service requests found</h2>
 
           <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-            Your previous service requests linked to this email will appear
-            here automatically. You can also link an old request using its
-            reference number.
+            Your service requests will appear here after they are submitted or
+            linked to your client account.
           </p>
 
           <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
@@ -291,11 +315,9 @@ export default function ClientRequestsPage() {
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="min-w-0">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
-                    {request.reference_number ? (
-                      <span className="rounded-full border border-navy/10 bg-navy-50 px-2.5 py-1 text-xs font-bold text-navy">
-                        {request.reference_number}
-                      </span>
-                    ) : null}
+                    <span className="rounded-full border border-navy/10 bg-lightgray px-2.5 py-1 text-xs font-bold text-navy">
+                      {request.reference_number || request.id}
+                    </span>
 
                     <span
                       className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(
@@ -338,15 +360,31 @@ export default function ClientRequestsPage() {
                   </div>
                 </div>
 
-                {request.id ? (
+                <div className="flex shrink-0 flex-wrap gap-2">
+                  <Link
+                    href={buildMessageHref(request)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal/20 bg-teal/10 px-3 py-2 text-xs font-semibold text-teal hover:bg-teal hover:text-white"
+                  >
+                    <MessageSquare size={14} />
+                    Messages
+                  </Link>
+
+                  <Link
+                    href={buildDocumentsHref(request)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-navy hover:bg-gold/20"
+                  >
+                    <FolderOpen size={14} />
+                    Documents
+                  </Link>
+
                   <Link
                     href={routes.client.requestDetail(request.id)}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-lightgray"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-lightgray"
                   >
-                    View Details
-                    <ArrowRight size={15} />
+                    Details
+                    <ArrowRight size={14} />
                   </Link>
-                ) : null}
+                </div>
               </div>
             </article>
           ))}

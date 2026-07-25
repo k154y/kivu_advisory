@@ -535,3 +535,30 @@ export type ApiRequestOptions = {
   auth?: boolean;
   cache?: RequestCache;
 };
+
+export type AccountantTaxCredential = {
+  id: string;
+  client_id: string;
+  system_id: string;
+  system_name: string;
+  login_url: string;
+  username: string;
+  notes?: string;
+  is_active: boolean;
+  has_password: boolean;
+  last_revealed_at?: string | null;
+  last_revealed_by_user_id?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type RevealedCredential = {
+  id: string;
+  client_id: string;
+  system_id: string;
+  system_name: string;
+  login_url: string;
+  username: string;
+  password: string;
+  notes?: string;
+};

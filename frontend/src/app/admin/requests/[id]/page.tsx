@@ -194,6 +194,10 @@ function buildMessageHref(request: AdminRequestDetail) {
     params.set("client_id", request.client_id);
   }
 
+  if (request.reference_number) {
+    params.set("reference", request.reference_number);
+  }
+
   return `${routes.admin.messages}?${params.toString()}`;
 }
 
