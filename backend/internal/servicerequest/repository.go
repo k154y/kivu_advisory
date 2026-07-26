@@ -47,6 +47,8 @@ type Repository interface {
 	UpdateStatus(ctx context.Context, id string, input UpdateStatusInput) (*ServiceRequest, error)
 	Delete(ctx context.Context, id string) error
 	CountByStatus(ctx context.Context) (map[string]int, error)
+	ClaimVisitorRequestsByEmail(ctx context.Context, clientID string, email string) (int64, error)
+	ClaimVisitorRequestByReference(ctx context.Context, clientID string, referenceNumber string, requesterEmail string, requesterPhone string) (*ServiceRequest, error)
 }
 
 type PostgresRepository struct {
@@ -110,6 +112,133 @@ func (r *PostgresRepository) Create(ctx context.Context, input CreateServiceRequ
 	}
 
 	return createdRequest, nil
+}
+
+func (r *PostgresRepository) ClaimVisitorRequestByReference(
+	ctx context.Context,
+	clientID string,
+	referenceNumber string,
+	requesterEmail string,
+	requesterPhone string,
+) (*ServiceRequest, error) {
+	if r == nil || r.pool == nil {
+		return nil, apperrors.Internal("service request repository is not initialized")
+	}
+
+	clientID = strings.TrimSpace(clientID)
+	referenceNumber = strings.TrimSpace(referenceNumber)
+	requesterEmail = strings.ToLower(strings.TrimSpace(requesterEmail))
+	requesterPhone = strings.TrimSpace(requesterPhone)
+
+	if clientID == "" {
+		return nil, apperrors.InvalidInput("client id is required")
+	}
+
+	if referenceNumber == "" {
+		return nil, apperrors.InvalidInput("reference number is required")
+	}
+
+	if requesterEmail == "" && requesterPhone == "" {
+		return nil, apperrors.InvalidInput("requester email or requester phone is required")
+	}
+
+	args := []any{
+		clientID,
+		referenceNumber,
+	}
+
+	verificationConditions := make([]string, 0, 2)
+
+	if requesterEmail != "" {
+		args = append(args, requesterEmail)
+		verificationConditions = append(
+			verificationConditions,
+			fmt.Sprintf("LOWER(BTRIM(COALESCE(requester_email, ''))) = $%d", len(args)),
+		)
+	}
+
+	if requesterPhone != "" {
+		phoneVariants := claimPhoneVariants(requesterPhone)
+
+		if len(phoneVariants) > 0 {
+			args = append(args, phoneVariants)
+			verificationConditions = append(
+				verificationConditions,
+				fmt.Sprintf("REGEXP_REPLACE(COALESCE(requester_phone, ''), '[^0-9]', '', 'g') = ANY($%d::text[])", len(args)),
+			)
+		}
+	}
+
+	if len(verificationConditions) == 0 {
+		return nil, apperrors.InvalidInput("requester email or requester phone is required")
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE service_requests
+		SET
+			client_id = $1,
+			updated_at = NOW()
+		WHERE UPPER(BTRIM(reference_number)) = UPPER(BTRIM($2))
+			AND NULLIF(BTRIM(COALESCE(client_id::text, '')), '') IS NULL
+			AND (%s)
+		RETURNING %s
+	`, strings.Join(verificationConditions, " OR "), serviceRequestSelectColumns)
+
+	item, err := scanServiceRequest(r.pool.QueryRow(ctx, query, args...))
+	if err != nil {
+		if stderrors.Is(err, pgx.ErrNoRows) {
+			return nil, apperrors.NotFound("service request was not found or cannot be claimed")
+		}
+
+		return nil, mapPostgresError(err)
+	}
+
+	return item, nil
+}
+
+func claimPhoneVariants(phone string) []string {
+	normalized := strings.TrimSpace(phone)
+	if normalized == "" {
+		return nil
+	}
+
+	normalized = strings.ReplaceAll(normalized, " ", "")
+	normalized = strings.ReplaceAll(normalized, "-", "")
+	normalized = strings.ReplaceAll(normalized, "(", "")
+	normalized = strings.ReplaceAll(normalized, ")", "")
+	normalized = strings.ReplaceAll(normalized, ".", "")
+	normalized = strings.TrimPrefix(normalized, "+")
+
+	onlyDigits := make([]rune, 0, len(normalized))
+	for _, character := range normalized {
+		if character >= '0' && character <= '9' {
+			onlyDigits = append(onlyDigits, character)
+		}
+	}
+
+	normalized = string(onlyDigits)
+	if normalized == "" {
+		return nil
+	}
+
+	variants := map[string]struct{}{
+		normalized: {},
+	}
+
+	if strings.HasPrefix(normalized, "250") && len(normalized) == 12 {
+		variants["0"+normalized[3:]] = struct{}{}
+	}
+
+	if strings.HasPrefix(normalized, "0") && len(normalized) == 10 {
+		variants["250"+normalized[1:]] = struct{}{}
+	}
+
+	result := make([]string, 0, len(variants))
+	for value := range variants {
+		result = append(result, value)
+	}
+
+	return result
 }
 
 func (r *PostgresRepository) FindByID(ctx context.Context, id string) (*ServiceRequest, error) {
@@ -425,6 +554,37 @@ func (r *PostgresRepository) CountByStatus(ctx context.Context) (map[string]int,
 	}
 
 	return counts, nil
+}
+
+func (r *PostgresRepository) ClaimVisitorRequestsByEmail(ctx context.Context, clientID string, email string) (int64, error) {
+	if r == nil || r.pool == nil {
+		return 0, apperrors.Internal("service request repository is not initialized")
+	}
+
+	clientID = strings.TrimSpace(clientID)
+	email = strings.ToLower(strings.TrimSpace(email))
+
+	if clientID == "" {
+		return 0, apperrors.InvalidInput("client id is required")
+	}
+
+	if email == "" {
+		return 0, nil
+	}
+
+	commandTag, err := r.pool.Exec(ctx, `
+		UPDATE service_requests
+		SET
+			client_id = $1,
+			updated_at = NOW()
+		WHERE client_id IS NULL
+			AND LOWER(BTRIM(COALESCE(requester_email, ''))) = $2
+	`, clientID, email)
+	if err != nil {
+		return 0, apperrors.InternalWrap(err, "failed to claim visitor service requests by email")
+	}
+
+	return commandTag.RowsAffected(), nil
 }
 
 type rowScanner interface {

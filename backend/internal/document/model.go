@@ -12,8 +12,11 @@ const (
 	StorageDriverLocal = "local"
 	StorageDriverR2    = "r2"
 
-	VisibilityClient     = "client"
-	VisibilityAdmin      = "admin"
+	VisibilityClient = "client"
+	VisibilityStaff  = "staff"
+	VisibilityAdmin  = "admin"
+
+	// Legacy input aliases. These are normalized before validation/database insert.
 	VisibilityAccountant = "accountant"
 	VisibilityInternal   = "internal"
 	VisibilityShared     = "shared"
@@ -22,10 +25,20 @@ const (
 	DocumentTypeAdminUpload      = "admin_upload"
 	DocumentTypeAccountantUpload = "accountant_upload"
 	DocumentTypeFinalDeliverable = "final_deliverable"
-	DocumentTypeInternal         = "internal"
+	DocumentTypeInternalFile     = "internal_file"
 
-	StatusActive  = "active"
-	StatusDeleted = "deleted"
+	// Legacy input alias. This is normalized to internal_file.
+	DocumentTypeInternal = "internal"
+
+	StatusUploaded    = "uploaded"
+	StatusUnderReview = "under_review"
+	StatusApproved    = "approved"
+	StatusRejected    = "rejected"
+	StatusArchived    = "archived"
+
+	// Backward-compatible aliases for older code.
+	StatusActive  = StatusUploaded
+	StatusDeleted = StatusArchived
 )
 
 type Document struct {
@@ -214,7 +227,7 @@ func NormalizeCreateInput(input CreateDocumentInput) CreateDocumentInput {
 	}
 
 	if input.Visibility == "" {
-		input.Visibility = VisibilityShared
+		input.Visibility = VisibilityStaff
 	}
 
 	if input.DocumentType == "" {
@@ -230,7 +243,7 @@ func NormalizeUpdateInput(input UpdateDocumentInput) UpdateDocumentInput {
 	input.Description = strings.TrimSpace(input.Description)
 
 	if input.Visibility == "" {
-		input.Visibility = VisibilityShared
+		input.Visibility = VisibilityStaff
 	}
 
 	if input.DocumentType == "" {
@@ -245,15 +258,46 @@ func NormalizeStorageDriver(value string) string {
 }
 
 func NormalizeVisibility(value string) string {
-	return strings.TrimSpace(strings.ToLower(value))
+	value = strings.TrimSpace(strings.ToLower(value))
+
+	switch value {
+	case "":
+		return ""
+	case VisibilityClient:
+		return VisibilityClient
+	case VisibilityAdmin, VisibilityInternal:
+		return VisibilityAdmin
+	case VisibilityStaff, VisibilityShared, VisibilityAccountant:
+		return VisibilityStaff
+	default:
+		return value
+	}
 }
 
 func NormalizeDocumentType(value string) string {
-	return strings.TrimSpace(strings.ToLower(value))
+	value = strings.TrimSpace(strings.ToLower(value))
+
+	switch value {
+	case "":
+		return ""
+	case DocumentTypeInternal, DocumentTypeInternalFile:
+		return DocumentTypeInternalFile
+	default:
+		return value
+	}
 }
 
 func NormalizeStatus(value string) string {
-	return strings.TrimSpace(strings.ToLower(value))
+	value = strings.TrimSpace(strings.ToLower(value))
+
+	switch value {
+	case "active":
+		return StatusUploaded
+	case "deleted":
+		return StatusArchived
+	default:
+		return value
+	}
 }
 
 func IsValidStorageDriver(value string) bool {
@@ -267,7 +311,7 @@ func IsValidStorageDriver(value string) bool {
 
 func IsValidVisibility(value string) bool {
 	switch NormalizeVisibility(value) {
-	case VisibilityClient, VisibilityAdmin, VisibilityAccountant, VisibilityInternal, VisibilityShared:
+	case VisibilityClient, VisibilityStaff, VisibilityAdmin:
 		return true
 	default:
 		return false
@@ -276,7 +320,11 @@ func IsValidVisibility(value string) bool {
 
 func IsValidDocumentType(value string) bool {
 	switch NormalizeDocumentType(value) {
-	case DocumentTypeClientUpload, DocumentTypeAdminUpload, DocumentTypeAccountantUpload, DocumentTypeFinalDeliverable, DocumentTypeInternal:
+	case DocumentTypeClientUpload,
+		DocumentTypeAdminUpload,
+		DocumentTypeAccountantUpload,
+		DocumentTypeFinalDeliverable,
+		DocumentTypeInternalFile:
 		return true
 	default:
 		return false
@@ -285,7 +333,11 @@ func IsValidDocumentType(value string) bool {
 
 func IsValidStatus(value string) bool {
 	switch NormalizeStatus(value) {
-	case StatusActive, StatusDeleted:
+	case StatusUploaded,
+		StatusUnderReview,
+		StatusApproved,
+		StatusRejected,
+		StatusArchived:
 		return true
 	default:
 		return false

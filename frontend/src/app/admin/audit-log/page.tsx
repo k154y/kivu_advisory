@@ -98,16 +98,14 @@ export default function AdminAuditLogPage() {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-[28px] bg-[#092B44] p-6 text-white">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-[#C99A35]">
-          Audit Log
-        </p>
-        <h1 className="mt-2 text-3xl font-semibold">System activity log</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">
+      
+       
+        <h1 className="text-2xl font-bold text-navy">System activity log</h1>
+        <p className="mt-1 text-sm text-gray-500">
           Tracks key administrative actions: status changes, assignments, and
           account/content management across the platform.
         </p>
-      </div>
+      
 
       <Card>
         <CardHeader className="flex flex-col gap-4 border-b border-slate-100 md:flex-row md:items-center md:justify-between">

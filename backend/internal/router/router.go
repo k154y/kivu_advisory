@@ -164,6 +164,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 
 	authService := auth.NewService(userService, tokenManager, options.Config.Password.MinLength)
 	authService.SetClientService(clientService)
+	authService.SetVisitorRequestClaimer(serviceRequestService)
 
 	authHandler := auth.NewHandler(authService, auditLogService)
 	clientHandler := client.NewHandler(clientService)

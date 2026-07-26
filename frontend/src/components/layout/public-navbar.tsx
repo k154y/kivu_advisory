@@ -63,7 +63,7 @@ export function PublicNavbar() {
             <span className="text-2xl font-bold tracking-tight text-navy">
               Kivu Advisory
             </span>
-            <span className="mb-3 ml-1 h-1.5 w-1.5 rounded-full bg-gold" />
+           
           </Link>
 
           <nav className="hidden items-center gap-8 lg:flex">

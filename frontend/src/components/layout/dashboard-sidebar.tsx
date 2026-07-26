@@ -199,7 +199,7 @@ function SidebarContent({
           <span className="text-xl font-bold tracking-tight text-white">
             Kivu Advisory
           </span>
-          <span className="mb-2.5 ml-1 h-1.5 w-1.5 rounded-full bg-gold" />
+        
         </Link>
 
         {onClose ? (

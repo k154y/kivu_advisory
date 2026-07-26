@@ -8,26 +8,35 @@ import { ChatWindow } from "@/components/forms/message-form";
 function ChatPageInner() {
   const params = useSearchParams();
 
-  const withUserId = params.get("with") ?? undefined;
+  const withUserId =
+    params.get("with") ??
+    params.get("client_id") ??
+    params.get("user_id") ??
+    undefined;
+
   const serviceRequestId =
     params.get("service_request_id") ?? params.get("request") ?? undefined;
+
+  const referenceNumber =
+    params.get("reference") ?? params.get("reference_number") ?? undefined;
 
   return (
     <ChatWindow
       defaultUserId={withUserId}
       defaultServiceRequestId={serviceRequestId}
+      defaultReferenceNumber={referenceNumber}
       roleLabel="admin"
     />
   );
 }
 
-export default function AdminChatPage() {
+export default function AdminMessagesPage() {
   return (
     <div className="max-w-5xl">
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-navy">Messages</h1>
         <p className="mt-1 text-sm text-gray-400">
-          Chat directly with clients and accountants.
+          Chat directly with clients and accountants using request references.
         </p>
       </div>
 

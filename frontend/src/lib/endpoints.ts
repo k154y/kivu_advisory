@@ -33,6 +33,7 @@ export const endpoints = {
     serviceRequests: "/client/service-requests",
     serviceRequestDetail: (id: string) =>
       withQuery("/client/service-requests/detail", { id }),
+    claimServiceRequest: "/client/service-requests/claim",
   },
 
 public: {
@@ -196,6 +197,20 @@ public: {
       withQuery("/accountant/assignments/detail", { id }),
     assignmentStatus: (id: string) =>
       withQuery("/accountant/assignments/status", { id }),
+  },
+
+    accountantTaxCredentials: {
+    list: (clientId: string) =>
+      withQuery("/accountant/tax-credentials", {
+        client_id: clientId,
+        page_size: 100,
+      }),
+
+    detail: (id: string) =>
+      withQuery("/accountant/tax-credentials/detail", { id }),
+
+    reveal: (id: string) =>
+      withQuery("/accountant/tax-credentials/reveal", { id }),
   },
 
   documents: {
