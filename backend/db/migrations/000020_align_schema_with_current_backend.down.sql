@@ -1,0 +1,4 @@
+-- No automatic rollback.
+-- This migration aligns old staging database column names and document values
+-- with the current backend schema.
+-- Reversing it automatically could break the current backend.
