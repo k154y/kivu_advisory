@@ -170,9 +170,9 @@ export default function AdminTaxCredentialsPage() {
     <div>
       <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
+          {/* <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
             Tax Credentials
-          </p>
+          </p> */}
 
           <h1 className="text-2xl font-bold text-navy">
             Client Tax Credentials

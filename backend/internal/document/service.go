@@ -273,7 +273,7 @@ func (s *Service) canViewDocument(ctx context.Context, actor Actor, item *Docume
 		return apperrors.NotFound("document not found")
 	}
 
-	if item.Status == StatusDeleted {
+	if item.Status == StatusDeleted || item.Status == StatusArchived {
 		return apperrors.NotFound("document not found")
 	}
 
@@ -289,18 +289,20 @@ func (s *Service) canViewDocument(ctx context.Context, actor Actor, item *Docume
 		return err
 	}
 
+	visibility := NormalizeVisibility(item.Visibility)
+
 	switch actor.Role {
 	case roleClient:
-		switch item.Visibility {
-		case VisibilityShared, VisibilityClient:
+		switch visibility {
+		case VisibilityClient:
 			return nil
 		default:
 			return apperrors.Forbidden("you do not have permission to access this document")
 		}
 
 	case roleAccountant:
-		switch item.Visibility {
-		case VisibilityShared, VisibilityAccountant:
+		switch visibility {
+		case VisibilityClient, VisibilityStaff:
 			return nil
 		default:
 			return apperrors.Forbidden("you do not have permission to access this document")
@@ -373,31 +375,32 @@ func normalizeUploadInput(actor Actor, input UploadDocumentInput) UploadDocument
 
 	switch actor.Role {
 	case roleClient:
-		input.Visibility = VisibilityShared
+		input.Visibility = VisibilityClient
 		input.DocumentType = DocumentTypeClientUpload
 		input.IsFinal = false
 
 	case roleAccountant:
-		if input.Visibility == "" || input.Visibility == VisibilityClient || input.Visibility == VisibilityAdmin || input.Visibility == VisibilityInternal {
-			input.Visibility = VisibilityShared
-		}
-
+		input.Visibility = VisibilityStaff
 		input.DocumentType = DocumentTypeAccountantUpload
 		input.IsFinal = false
 
 	case roleAdmin:
+		if input.IsFinal {
+			input.Visibility = VisibilityClient
+			input.DocumentType = DocumentTypeFinalDeliverable
+			return input
+		}
+
 		if input.Visibility == "" {
-			input.Visibility = VisibilityInternal
+			input.Visibility = VisibilityStaff
 		}
 
 		if input.DocumentType == "" {
 			input.DocumentType = DocumentTypeAdminUpload
 		}
 
-		if input.IsFinal {
-			input.Visibility = VisibilityShared
-			input.DocumentType = DocumentTypeFinalDeliverable
-		}
+		input.Visibility = NormalizeVisibility(input.Visibility)
+		input.DocumentType = NormalizeDocumentType(input.DocumentType)
 	}
 
 	return input

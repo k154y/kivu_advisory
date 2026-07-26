@@ -70,12 +70,15 @@ export const routes = {
     requestDetail: (id: string) => `/client/requests/${id}`,
     documents: "/client/documents",
     messages: "/client/messages",
+    linkRequest: "/client/requests/link",
   },
 accountant: {
   dashboard: "/accountant/dashboard",
   assignedWork: "/accountant/assigned-work",
   assignmentDetail: (id: string) => `/accountant/assigned-work/${id}`,
+  documents: "/accountant/documents",
   messages: "/accountant/messages",
+  taxCredentials: "/accountant/tax-credentials",
   profile: "/accountant/profile",
 },
 } as const;
@@ -137,7 +140,9 @@ export const clientNavigation = [
 export const accountantNavigation = [
   { label: "Dashboard", href: routes.accountant.dashboard },
   { label: "Assigned Work", href: routes.accountant.assignedWork },
+  { label: "Documents", href: routes.accountant.documents },
   { label: "Messages", href: routes.accountant.messages },
+  { label: "Tax Credentials", href: routes.accountant.taxCredentials },
   { label: "My Profile", href: routes.accountant.profile },
 ];
 

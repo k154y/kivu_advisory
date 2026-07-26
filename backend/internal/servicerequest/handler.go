@@ -31,6 +31,11 @@ type Handler struct {
 	auditLogger *auditlog.Service
 }
 
+type ClaimServiceRequestRequest struct {
+	ReferenceNumber string `json:"reference_number"`
+	RequesterEmail  string `json:"requester_email"`
+	RequesterPhone  string `json:"requester_phone"`
+}
 func (h *Handler) recordAudit(r *http.Request, action string, entityID string, description string) {
 	if h.auditLogger == nil {
 		return
@@ -154,6 +159,39 @@ func (h *Handler) CreateClientRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Created(w, "client service request created successfully", createdRequest)
+}
+
+func (h *Handler) ClaimClientRequest(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.service == nil {
+		response.InternalServerError(w)
+		return
+	}
+
+	clientID, err := h.currentClientID(r)
+	if err != nil {
+		writeServiceRequestHandlerError(w, err)
+		return
+	}
+
+	var request ClaimServiceRequestRequest
+	if err := readServiceRequestJSON(w, r, &request); err != nil {
+		writeServiceRequestHandlerError(w, err)
+		return
+	}
+
+	claimedRequest, err := h.service.ClaimVisitorRequestByReference(
+		r.Context(),
+		clientID,
+		request.ReferenceNumber,
+		request.RequesterEmail,
+		request.RequesterPhone,
+	)
+	if err != nil {
+		writeServiceRequestHandlerError(w, err)
+		return
+	}
+
+	response.OK(w, "service request linked to your account successfully", claimedRequest)
 }
 
 func (h *Handler) ListClientRequests(w http.ResponseWriter, r *http.Request) {

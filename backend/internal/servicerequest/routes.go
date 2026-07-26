@@ -121,7 +121,21 @@ func RegisterRoutes(
 				),
 			),
 		),
+	
 	)
+
+	mux.Handle(
+	api+"/client/service-requests/claim",
+	methodOnlyHandler(
+		http.MethodPost,
+		middleware.RequireAuth(tokenVerifier)(
+			middleware.RequireRole(middleware.RoleClient)(
+				http.HandlerFunc(handler.ClaimClientRequest),
+			),
+		),
+	),
+)
+
 }
 
 func methodOnlyHandler(method string, handler http.Handler) http.Handler {

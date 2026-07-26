@@ -1,25 +1,33 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { resolveAccountantRequestMap } from "@/lib/accountant-request-resolver";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   Circle,
   MessageCircle,
   Paperclip,
-  Plus,
   RefreshCcw,
+  Search,
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/hooks/use-auth";
 import { api } from "@/lib/api";
+import {
+  uploadDocument,
+  type DocumentType,
+  type DocumentVisibility,
+} from "@/lib/documents";
 import { cn } from "@/lib/utils";
 
 type MessageItem = {
   id: string;
   service_request_id?: string;
   sender_user_id?: string;
+  sender_name?: string;
   recipient_user_id?: string;
+  recipient_name?: string;
   subject?: string;
   body: string;
   message_type: "message" | "note" | "system" | "status_update" | string;
@@ -31,12 +39,24 @@ type MessageItem = {
   updated_at?: string;
 };
 
+type RequestSummary = {
+  id: string;
+  referenceNumber: string;
+  title: string;
+  clientName?: string;
+  clientUserId?: string;
+  accountantName?: string;
+  accountantUserId?: string;
+};
+
 type ChatThread = {
   key: string;
   title: string;
   subtitle: string;
   serviceRequestId?: string;
+  referenceNumber?: string;
   recipientUserId?: string;
+  participantName?: string;
   subject?: string;
   lastMessage?: string;
   lastDate?: string;
@@ -46,21 +66,18 @@ type ChatThread = {
 type ChatWindowProps = {
   defaultUserId?: string;
   defaultServiceRequestId?: string;
+  defaultReferenceNumber?: string;
   roleLabel?: "admin" | "accountant" | "client";
 };
 
-function getMessageItems(response: unknown): MessageItem[] {
-  if (Array.isArray(response)) {
-    return response as MessageItem[];
-  }
+function getResponseItems<T>(response: unknown): T[] {
+  if (Array.isArray(response)) return response as T[];
 
-  if (!response || typeof response !== "object") {
-    return [];
-  }
+  if (!response || typeof response !== "object") return [];
 
   const objectResponse = response as {
-    items?: MessageItem[];
-    data?: MessageItem[] | { items?: MessageItem[] };
+    items?: T[];
+    data?: T[] | { items?: T[] };
   };
 
   if (Array.isArray(objectResponse.items)) return objectResponse.items;
@@ -77,8 +94,36 @@ function getMessageItems(response: unknown): MessageItem[] {
   return [];
 }
 
+function getCreatedMessage(response: unknown): MessageItem | null {
+  const items = getResponseItems<MessageItem>(response);
+
+  if (items[0]) return items[0];
+
+  if (!response || typeof response !== "object") return null;
+
+  const objectResponse = response as {
+    id?: string;
+    body?: string;
+    data?: {
+      id?: string;
+      body?: string;
+    };
+  };
+
+  if (objectResponse.id && objectResponse.body) {
+    return objectResponse as MessageItem;
+  }
+
+  if (objectResponse.data?.id && objectResponse.data?.body) {
+    return objectResponse.data as MessageItem;
+  }
+
+  return null;
+}
+
 function getCreatedTime(value?: string) {
   if (!value) return 0;
+
   const time = new Date(value).getTime();
   return Number.isNaN(time) ? 0 : time;
 }
@@ -104,6 +149,18 @@ function shortId(value?: string) {
   return `${value.slice(0, 8)}...${value.slice(-4)}`;
 }
 
+function normalizeReference(value?: string) {
+  return (value || "").trim().toUpperCase().replace(/\s+/g, "");
+}
+
+function getSafeErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
 function getOtherUserId(message: MessageItem, currentUserId?: string) {
   if (message.sender_user_id && message.sender_user_id !== currentUserId) {
     return message.sender_user_id;
@@ -114,6 +171,210 @@ function getOtherUserId(message: MessageItem, currentUserId?: string) {
   }
 
   return message.recipient_user_id || message.sender_user_id || "";
+}
+
+function roleText(role?: string) {
+  if (role === "admin") return "Admin";
+  if (role === "accountant") return "Accountant";
+  if (role === "client") return "Client";
+  return "User";
+}
+
+function roleTone(role?: string) {
+  if (role === "admin") return "bg-red-50 text-red-700";
+  if (role === "accountant") return "bg-teal/10 text-teal";
+  if (role === "client") return "bg-indigo-50 text-indigo-700";
+  return "bg-gray-100 text-gray-600";
+}
+
+function getString(value: unknown) {
+  return typeof value === "string" ? value : "";
+}
+
+function normalizeRequestItem(item: unknown): RequestSummary | null {
+  if (!item || typeof item !== "object") return null;
+
+  const objectItem = item as Record<string, unknown>;
+
+  const nestedRequest =
+    typeof objectItem.service_request === "object" &&
+    objectItem.service_request !== null
+      ? (objectItem.service_request as Record<string, unknown>)
+      : typeof objectItem.request === "object" && objectItem.request !== null
+        ? (objectItem.request as Record<string, unknown>)
+        : null;
+
+  const id =
+    getString(objectItem.service_request_id) ||
+    getString(objectItem.request_id) ||
+    getString(nestedRequest?.id) ||
+    getString(nestedRequest?.service_request_id) ||
+    getString(nestedRequest?.request_id) ||
+    getString(objectItem.id);
+
+  if (!id) return null;
+
+  const referenceNumber =
+    getString(objectItem.reference_number) ||
+    getString(objectItem.service_request_reference_number) ||
+    getString(objectItem.request_reference_number) ||
+    getString(nestedRequest?.reference_number) ||
+    id;
+
+  const title =
+    getString(objectItem.title) ||
+    getString(objectItem.service_name) ||
+    getString(objectItem.service_title) ||
+    getString(objectItem.request_title) ||
+    getString(nestedRequest?.title) ||
+    getString(nestedRequest?.service_name) ||
+    "Service request";
+
+  const clientName =
+    getString(objectItem.requester_name) ||
+    getString(objectItem.client_name) ||
+    getString(objectItem.full_name) ||
+    getString(objectItem.name) ||
+    getString(nestedRequest?.requester_name) ||
+    getString(nestedRequest?.client_name);
+
+  const clientUserId =
+    getString(objectItem.client_user_id) ||
+    getString(objectItem.user_id) ||
+    getString(nestedRequest?.client_user_id) ||
+    getString(nestedRequest?.user_id);
+
+  const accountantName =
+    getString(objectItem.accountant_name) ||
+    getString(objectItem.assigned_accountant_name) ||
+    getString(objectItem.assigned_to_name);
+
+  const accountantUserId =
+    getString(objectItem.accountant_user_id) ||
+    getString(objectItem.assigned_accountant_user_id) ||
+    getString(objectItem.assigned_to);
+
+  return {
+    id,
+    referenceNumber,
+    title,
+    clientName,
+    clientUserId,
+    accountantName,
+    accountantUserId,
+  };
+}
+
+async function loadRequestsForRole(role?: "admin" | "accountant" | "client") {
+  if (role === "accountant") {
+    const accountantMap = await resolveAccountantRequestMap();
+
+    return new Map(
+      Array.from(accountantMap.entries()).map(([id, request]) => [
+        id,
+        {
+          id: request.id,
+          referenceNumber: request.referenceNumber,
+          title: request.title,
+          clientName: request.clientName,
+          clientUserId: request.clientUserId,
+          accountantName: request.accountantName,
+          accountantUserId: request.accountantUserId,
+        },
+      ]),
+    );
+  }
+
+  const paths =
+    role === "client"
+      ? [
+          "/client/service-requests?page_size=500",
+          "/client/requests?page_size=500",
+        ]
+      : [
+          "/admin/service-requests?page_size=500",
+          "/admin/requests?page_size=500",
+        ];
+
+  const map = new Map<string, RequestSummary>();
+
+  for (const path of paths) {
+    try {
+      const result = await api.get<unknown>(path);
+      const items = getResponseItems<unknown>(result.data);
+
+      for (const item of items) {
+        const request = normalizeRequestItem(item);
+
+        if (request) {
+          map.set(request.id, request);
+        }
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return map;
+}
+async function loadMessagesForRole(
+  role: "admin" | "accountant" | "client" | undefined,
+  requestMap: Map<string, RequestSummary>,
+  defaultServiceRequestId?: string,
+) {
+  if (role === "admin") {
+    try {
+      const result = await api.get<unknown>("/messages?page_size=500");
+      return getResponseItems<MessageItem>(result.data);
+    } catch {
+      return [];
+    }
+  }
+
+  const requestIds = new Set<string>(Array.from(requestMap.keys()));
+
+  if (defaultServiceRequestId) {
+    requestIds.add(defaultServiceRequestId);
+  }
+
+  const allMessages: MessageItem[] = [];
+
+  for (const requestId of requestIds) {
+    try {
+      const result = await api.get<unknown>(
+        `/messages?service_request_id=${encodeURIComponent(
+          requestId,
+        )}&page_size=200`,
+      );
+
+      allMessages.push(...getResponseItems<MessageItem>(result.data));
+    } catch {
+      continue;
+    }
+  }
+
+  return allMessages;
+}
+
+function getParticipantNameForRequest(
+  request: RequestSummary | undefined,
+  role?: "admin" | "accountant" | "client",
+) {
+  if (!request) return "";
+
+  if (role === "admin") {
+    return request.clientName || request.accountantName || "Client";
+  }
+
+  if (role === "accountant") {
+    return request.clientName || "Client";
+  }
+
+  if (role === "client") {
+    return request.accountantName || "Kivu Advisory Team";
+  }
+
+  return request.clientName || request.accountantName || "";
 }
 
 function makeThreadKey(message: MessageItem, currentUserId?: string) {
@@ -130,27 +391,43 @@ function makeThreadKey(message: MessageItem, currentUserId?: string) {
   return `message:${message.id}`;
 }
 
-function buildThreads(messages: MessageItem[], currentUserId?: string) {
+function buildThreads(
+  messages: MessageItem[],
+  currentUserId: string | undefined,
+  requestMap: Map<string, RequestSummary>,
+  role?: "admin" | "accountant" | "client",
+) {
   const map = new Map<string, ChatThread>();
 
   for (const message of messages) {
     const key = makeThreadKey(message, currentUserId);
+    const request = message.service_request_id
+      ? requestMap.get(message.service_request_id)
+      : undefined;
+
     const otherUserId = getOtherUserId(message, currentUserId);
-    const existing = map.get(key);
+
+    const participantName =
+      getParticipantNameForRequest(request, role) ||
+      message.sender_name ||
+      message.recipient_name ||
+      "";
 
     const isRequestThread = Boolean(message.service_request_id);
+
     const title = isRequestThread
-      ? `Service Request ${shortId(message.service_request_id)}`
-      : otherUserId
-        ? `User ${shortId(otherUserId)}`
-        : message.subject || "Conversation";
+      ? request?.referenceNumber || `Request ${shortId(message.service_request_id)}`
+      : participantName || `User ${shortId(otherUserId)}`;
 
     const subtitle = isRequestThread
-      ? message.subject || "Request conversation"
+      ? [request?.title, participantName].filter(Boolean).join(" · ") ||
+        "Request conversation"
       : message.subject || "Direct conversation";
 
     const unread =
       !message.is_read && message.recipient_user_id === currentUserId ? 1 : 0;
+
+    const existing = map.get(key);
 
     if (!existing) {
       map.set(key, {
@@ -158,7 +435,9 @@ function buildThreads(messages: MessageItem[], currentUserId?: string) {
         title,
         subtitle,
         serviceRequestId: message.service_request_id,
-        recipientUserId: otherUserId || message.recipient_user_id,
+        referenceNumber: request?.referenceNumber,
+        recipientUserId: otherUserId,
+        participantName,
         subject: message.subject,
         lastMessage: message.body,
         lastDate: message.created_at,
@@ -182,6 +461,24 @@ function buildThreads(messages: MessageItem[], currentUserId?: string) {
   );
 }
 
+function buildRequestThread(
+  request: RequestSummary,
+  role?: "admin" | "accountant" | "client",
+): ChatThread {
+  const participantName = getParticipantNameForRequest(request, role);
+
+  return {
+    key: `request:${request.id}`,
+    title: request.referenceNumber,
+    subtitle: [request.title, participantName].filter(Boolean).join(" · "),
+    serviceRequestId: request.id,
+    referenceNumber: request.referenceNumber,
+    participantName,
+    subject: request.referenceNumber,
+    unreadCount: 0,
+  };
+}
+
 function isMessageInThread(
   message: MessageItem,
   thread: ChatThread,
@@ -199,79 +496,178 @@ function isMessageInThread(
   return false;
 }
 
-function roleText(role?: string) {
-  if (role === "admin") return "Admin";
-  if (role === "accountant") return "Accountant";
-  if (role === "client") return "Client";
-  return "User";
-}
+function getSenderDisplayName(
+  message: MessageItem,
+  currentUserId: string | undefined,
+  request: RequestSummary | undefined,
+) {
+  if (message.sender_user_id === currentUserId) return "You";
 
-function roleTone(role?: string) {
-  if (role === "admin") return "bg-red-50 text-red-700";
-  if (role === "accountant") return "bg-teal/10 text-teal";
-  if (role === "client") return "bg-indigo-50 text-indigo-700";
-  return "bg-gray-100 text-gray-600";
-}
+  if (message.sender_name) return message.sender_name;
 
-function getSafeErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
+  if (request?.clientUserId && message.sender_user_id === request.clientUserId) {
+    return request.clientName || "Client";
   }
 
-  return fallback;
+  if (
+    request?.accountantUserId &&
+    message.sender_user_id === request.accountantUserId
+  ) {
+    return request.accountantName || "Accountant";
+  }
+
+  return `User ${shortId(message.sender_user_id)}`;
+}
+
+function getAllowedVisibilityOptions(role?: "admin" | "accountant" | "client") {
+  if (role === "admin") {
+    return [
+      { value: "conversation", label: "Conversation" },
+      { value: "staff", label: "Staff" },
+      { value: "admin", label: "Admin only" },
+    ] as const;
+  }
+
+  if (role === "accountant") {
+    return [
+      { value: "conversation", label: "Conversation" },
+      { value: "staff", label: "Staff" },
+    ] as const;
+  }
+
+  return [{ value: "conversation", label: "Conversation" }] as const;
+}
+
+function getMessageTypeForVisibility(visibility: "conversation" | "staff" | "admin") {
+  return visibility === "conversation" ? "message" : "note";
+}
+
+function getDocumentUploadSettings(
+  role: "admin" | "accountant" | "client" | undefined,
+  visibility: "conversation" | "staff" | "admin",
+): {
+  visibility: DocumentVisibility;
+  document_type: DocumentType;
+  is_final: boolean;
+} {
+  if (role === "client") {
+    return {
+      visibility: "client",
+      document_type: "client_upload",
+      is_final: false,
+    };
+  }
+
+  if (role === "accountant") {
+    return {
+      visibility: visibility === "conversation" ? "client" : "staff",
+      document_type: "accountant_upload",
+      is_final: false,
+    };
+  }
+
+  if (visibility === "admin") {
+    return {
+      visibility: "admin",
+      document_type: "internal_file",
+      is_final: false,
+    };
+  }
+
+  if (visibility === "conversation") {
+    return {
+      visibility: "client",
+      document_type: "admin_upload",
+      is_final: false,
+    };
+  }
+
+  return {
+    visibility: "staff",
+    document_type: "admin_upload",
+    is_final: false,
+  };
 }
 
 export function ChatWindow({
   defaultUserId,
   defaultServiceRequestId,
+  defaultReferenceNumber,
   roleLabel,
 }: ChatWindowProps) {
   const { user } = useAuth();
 
+  const activeRole =
+    roleLabel ||
+    (user?.role === "admin" ||
+    user?.role === "accountant" ||
+    user?.role === "client"
+      ? user.role
+      : undefined);
+
   const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [requestMap, setRequestMap] = useState<Map<string, RequestSummary>>(
+    () => new Map(),
+  );
+
   const [activeThreadKey, setActiveThreadKey] = useState<string | null>(() => {
     if (defaultServiceRequestId) return `request:${defaultServiceRequestId}`;
     if (defaultUserId) return `user:${defaultUserId}`;
     return null;
   });
 
-  const [manualRecipientId, setManualRecipientId] = useState(
-    defaultUserId || "",
+  const [openedRequestId, setOpenedRequestId] = useState<string | null>(
+    defaultServiceRequestId || null,
   );
-  const [manualServiceRequestId, setManualServiceRequestId] = useState(
-    defaultServiceRequestId || "",
+
+  const [referenceSearch, setReferenceSearch] = useState(
+    defaultReferenceNumber || "",
   );
-  const [manualSubject, setManualSubject] = useState("");
 
   const [text, setText] = useState("");
-  const [visibility, setVisibility] = useState<
-    "conversation" | "staff" | "admin"
-  >("conversation");
+  const [visibility, setVisibility] = useState<"conversation" | "staff" | "admin">(
+    "conversation",
+  );
 
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const loadMessages = async () => {
+  const visibilityOptions = getAllowedVisibilityOptions(activeRole);
+
+  const loadAll = async () => {
     setLoading(true);
 
     try {
-      const query = defaultServiceRequestId
-        ? `/messages?service_request_id=${encodeURIComponent(
-            defaultServiceRequestId,
-          )}&page_size=100`
-        : "/messages?page_size=100";
+      const loadedRequestMap = await loadRequestsForRole(activeRole);
 
-      const result = await api.get<unknown>(query);
-      const items = getMessageItems(result.data).sort(
+      if (defaultServiceRequestId && !loadedRequestMap.has(defaultServiceRequestId)) {
+        loadedRequestMap.set(defaultServiceRequestId, {
+          id: defaultServiceRequestId,
+          referenceNumber:
+            defaultReferenceNumber || `Request ${shortId(defaultServiceRequestId)}`,
+          title: "Service request",
+        });
+      }
+
+      const loadedMessages = await loadMessagesForRole(
+        activeRole,
+        loadedRequestMap,
+        defaultServiceRequestId,
+      );
+
+      const sortedMessages = loadedMessages.sort(
         (a, b) => getCreatedTime(a.created_at) - getCreatedTime(b.created_at),
       );
 
-      setMessages(items);
+      setMessages(sortedMessages);
+      setRequestMap(loadedRequestMap);
 
-      if (!activeThreadKey && items.length > 0) {
-        setActiveThreadKey(makeThreadKey(items[items.length - 1], user?.id));
+      if (!activeThreadKey && sortedMessages.length > 0) {
+        setActiveThreadKey(makeThreadKey(sortedMessages[sortedMessages.length - 1], user?.id));
       }
     } catch (error) {
       toast.error(getSafeErrorMessage(error, "Failed to load messages."));
@@ -281,54 +677,81 @@ export function ChatWindow({
   };
 
   useEffect(() => {
-    void loadMessages();
+    void loadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [defaultServiceRequestId]);
+  }, [activeRole]);
+
+  useEffect(() => {
+    if (!defaultReferenceNumber || requestMap.size === 0) return;
+
+    const normalized = normalizeReference(defaultReferenceNumber);
+
+    for (const request of requestMap.values()) {
+      if (normalizeReference(request.referenceNumber) === normalized) {
+        setOpenedRequestId(request.id);
+        setActiveThreadKey(`request:${request.id}`);
+        return;
+      }
+    }
+  }, [defaultReferenceNumber, requestMap]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length, activeThreadKey]);
 
   const threads = useMemo(
-    () => buildThreads(messages, user?.id),
-    [messages, user?.id],
+    () => buildThreads(messages, user?.id, requestMap, activeRole),
+    [messages, user?.id, requestMap, activeRole],
   );
 
-  const syntheticThread = useMemo<ChatThread | null>(() => {
-    if (defaultServiceRequestId) {
-      return {
-        key: `request:${defaultServiceRequestId}`,
-        title: `Service Request ${shortId(defaultServiceRequestId)}`,
-        subtitle: "Request conversation",
-        serviceRequestId: defaultServiceRequestId,
-        subject: manualSubject || "Service request message",
-        unreadCount: 0,
+  const syntheticThreads = useMemo(() => {
+    const list: ChatThread[] = [];
+
+    if (openedRequestId) {
+      const request = requestMap.get(openedRequestId) || {
+        id: openedRequestId,
+        referenceNumber:
+          defaultReferenceNumber || `Request ${shortId(openedRequestId)}`,
+        title: "Service request",
       };
+
+      list.push(buildRequestThread(request, activeRole));
     }
 
     if (defaultUserId) {
-      return {
+      list.push({
         key: `user:${defaultUserId}`,
         title: `User ${shortId(defaultUserId)}`,
         subtitle: "Direct conversation",
         recipientUserId: defaultUserId,
-        subject: manualSubject || "Direct message",
+        subject: "Direct message",
         unreadCount: 0,
-      };
+      });
     }
 
-    return null;
-  }, [defaultServiceRequestId, defaultUserId, manualSubject]);
+    return list;
+  }, [openedRequestId, requestMap, activeRole, defaultReferenceNumber, defaultUserId]);
 
   const allThreads = useMemo(() => {
-    if (!syntheticThread) return threads;
+    const result = [...threads];
 
-    const exists = threads.some((thread) => thread.key === syntheticThread.key);
-    return exists ? threads : [syntheticThread, ...threads];
-  }, [threads, syntheticThread]);
+    for (const syntheticThread of syntheticThreads) {
+      const exists = result.some((thread) => thread.key === syntheticThread.key);
+
+      if (!exists) {
+        result.unshift(syntheticThread);
+      }
+    }
+
+    return result;
+  }, [threads, syntheticThreads]);
 
   const selectedThread =
     allThreads.find((thread) => thread.key === activeThreadKey) || null;
+
+  const selectedRequest = selectedThread?.serviceRequestId
+    ? requestMap.get(selectedThread.serviceRequestId)
+    : undefined;
 
   const selectedMessages = useMemo(() => {
     if (!selectedThread) return [];
@@ -338,55 +761,86 @@ export function ChatWindow({
     );
   }, [messages, selectedThread, user?.id]);
 
-  const handleStartConversation = () => {
-    const recipientId = manualRecipientId.trim();
-    const serviceRequestId = manualServiceRequestId.trim();
+  const filteredThreads = useMemo(() => {
+    const term = referenceSearch.trim().toLowerCase();
 
-    if (!recipientId && !serviceRequestId) {
-      toast.error("Enter a recipient user ID or service request ID.");
+    if (!term) return allThreads;
+
+    return allThreads.filter((thread) =>
+      [
+        thread.title,
+        thread.subtitle,
+        thread.referenceNumber,
+        thread.participantName,
+        thread.lastMessage,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(term),
+    );
+  }, [allThreads, referenceSearch]);
+
+  const handleOpenByReference = () => {
+    const normalized = normalizeReference(referenceSearch);
+
+    if (!normalized) {
+      toast.error("Enter a request reference number.");
       return;
     }
 
-    if (serviceRequestId) {
-      setActiveThreadKey(`request:${serviceRequestId}`);
-      return;
+    for (const request of requestMap.values()) {
+      if (normalizeReference(request.referenceNumber) === normalized) {
+        setOpenedRequestId(request.id);
+        setActiveThreadKey(`request:${request.id}`);
+        return;
+      }
     }
 
-    setActiveThreadKey(`user:${recipientId}`);
+    toast.error("No request found with that reference number.");
   };
 
   const handleSend = async () => {
     if (!text.trim()) return;
 
-    const serviceRequestId =
-      selectedThread?.serviceRequestId || manualServiceRequestId.trim();
-    const recipientUserId =
-      selectedThread?.recipientUserId || manualRecipientId.trim();
+    if (!selectedThread) {
+      toast.error("Select a conversation first.");
+      return;
+    }
 
-    if (!serviceRequestId && !recipientUserId) {
-      toast.error("Select or start a conversation first.");
+    if (!selectedThread.serviceRequestId && !selectedThread.recipientUserId) {
+      toast.error("This conversation has no request or recipient.");
       return;
     }
 
     setSending(true);
 
     try {
+      const finalVisibility =
+        activeRole === "client"
+          ? "conversation"
+          : activeRole === "accountant" && visibility === "admin"
+            ? "staff"
+            : visibility;
+
       const payload = {
-        service_request_id: serviceRequestId || undefined,
-        recipient_user_id: recipientUserId || undefined,
+        service_request_id: selectedThread.serviceRequestId || undefined,
+        recipient_user_id: selectedThread.serviceRequestId
+          ? undefined
+          : selectedThread.recipientUserId || undefined,
         subject:
-          selectedThread?.subject ||
-          manualSubject.trim() ||
-          selectedThread?.title ||
+          selectedThread.referenceNumber ||
+          selectedThread.subject ||
+          selectedThread.title ||
           "Message",
         body: text.trim(),
-        message_type: "message",
-        visibility,
-        is_internal: visibility !== "conversation",
+        message_type: getMessageTypeForVisibility(finalVisibility),
+        visibility: finalVisibility,
+        is_internal: finalVisibility !== "conversation",
       };
 
       const result = await api.post<unknown>("/messages", payload);
-      const created = getMessageItems(result.data)[0];
+      const created = getCreatedMessage(result.data);
 
       if (created) {
         setMessages((current) =>
@@ -395,7 +849,7 @@ export function ChatWindow({
           ),
         );
       } else {
-        await loadMessages();
+        await loadAll();
       }
 
       setText("");
@@ -406,9 +860,91 @@ export function ChatWindow({
     }
   };
 
-  const selectedTitle = selectedThread?.title || "No conversation selected";
-  const selectedSubtitle =
-    selectedThread?.subtitle || "Choose a conversation or start a new one.";
+  const handleFileUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    if (!file) return;
+
+    if (!selectedThread?.serviceRequestId) {
+      toast.error("Open a service request conversation before uploading a document.");
+      return;
+    }
+
+    if (file.size > 20 * 1024 * 1024) {
+      toast.error("File is too large. Maximum allowed size is 20 MB.");
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const finalVisibility =
+        activeRole === "client"
+          ? "conversation"
+          : activeRole === "accountant" && visibility === "admin"
+            ? "staff"
+            : visibility;
+
+      const documentSettings = getDocumentUploadSettings(
+        activeRole,
+        finalVisibility,
+      );
+
+      await uploadDocument({
+        file,
+        service_request_id: selectedThread.serviceRequestId,
+        visibility: documentSettings.visibility,
+        document_type: documentSettings.document_type,
+        is_final: documentSettings.is_final,
+        description: `Uploaded from chat for ${
+          selectedThread.referenceNumber || selectedThread.title
+        }`,
+      });
+
+      const messageBody = text.trim()
+        ? `${text.trim()}\n\nUploaded document: ${file.name}`
+        : `Uploaded document: ${file.name}`;
+
+      const result = await api.post<unknown>("/messages", {
+        service_request_id: selectedThread.serviceRequestId,
+        subject:
+          selectedThread.referenceNumber ||
+          selectedThread.subject ||
+          selectedThread.title ||
+          "Document upload",
+        body: messageBody,
+        message_type: getMessageTypeForVisibility(finalVisibility),
+        visibility: finalVisibility,
+        is_internal: finalVisibility !== "conversation",
+      });
+
+      const created = getCreatedMessage(result.data);
+
+      if (created) {
+        setMessages((current) =>
+          [...current, created].sort(
+            (a, b) => getCreatedTime(a.created_at) - getCreatedTime(b.created_at),
+          ),
+        );
+      } else {
+        await loadAll();
+      }
+
+      setText("");
+      toast.success("Document uploaded and message sent.");
+    } catch (error) {
+      toast.error(getSafeErrorMessage(error, "Failed to upload document."));
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const selectedTitle =
+    selectedThread?.participantName || selectedThread?.title || "No conversation selected";
 
   return (
     <div
@@ -421,13 +957,13 @@ export function ChatWindow({
             <div>
               <h2 className="text-sm font-semibold text-navy">Conversations</h2>
               <p className="mt-0.5 text-xs text-gray-400">
-                Service request and direct messages
+                Search by request reference number
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => void loadMessages()}
+              onClick={() => void loadAll()}
               className="rounded-lg border border-gray-200 p-2 text-gray-400 hover:bg-lightgray hover:text-navy"
               title="Refresh"
             >
@@ -437,46 +973,28 @@ export function ChatWindow({
         </div>
 
         <div className="border-b border-gray-100 bg-lightgray/40 p-4">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">
-            Start conversation
-          </p>
-
-          <div className="space-y-2">
-            <input
-              type="text"
-              value={manualRecipientId}
-              onChange={(event) => setManualRecipientId(event.target.value)}
-              placeholder="Recipient user ID"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal/30"
+          <div className="relative">
+            <Search
+              size={14}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             />
 
             <input
               type="text"
-              value={manualServiceRequestId}
-              onChange={(event) =>
-                setManualServiceRequestId(event.target.value)
-              }
-              placeholder="Service request ID optional"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal/30"
+              value={referenceSearch}
+              onChange={(event) => setReferenceSearch(event.target.value)}
+              placeholder="Search or enter reference number..."
+              className="w-full rounded-lg border border-gray-200 py-2.5 pl-9 pr-3 text-xs outline-none focus:ring-2 focus:ring-teal/30"
             />
-
-            <input
-              type="text"
-              value={manualSubject}
-              onChange={(event) => setManualSubject(event.target.value)}
-              placeholder="Subject optional"
-              className="w-full rounded-lg border border-gray-200 px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-teal/30"
-            />
-
-            <button
-              type="button"
-              onClick={handleStartConversation}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white hover:bg-navy-700"
-            >
-              <Plus size={14} />
-              Open Chat
-            </button>
           </div>
+
+          <button
+            type="button"
+            onClick={handleOpenByReference}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white hover:bg-teal"
+          >
+            Open by Reference
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -484,34 +1002,44 @@ export function ChatWindow({
             <div className="flex justify-center py-12">
               <div className="h-6 w-6 animate-spin rounded-full border-2 border-navy border-t-transparent" />
             </div>
-          ) : allThreads.length === 0 ? (
+          ) : filteredThreads.length === 0 ? (
             <div className="px-6 py-10 text-center">
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-lightgray">
                 <MessageCircle size={20} className="text-gray-300" />
               </div>
               <p className="text-sm font-medium text-gray-500">
-                No conversations yet
+                No conversations found
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                Start with a recipient user ID or a service request ID.
+                Search using a request reference number.
               </p>
             </div>
           ) : (
-            allThreads.map((thread) => {
+            filteredThreads.map((thread) => {
               const active = activeThreadKey === thread.key;
 
               return (
                 <button
                   key={thread.key}
                   type="button"
-                  onClick={() => setActiveThreadKey(thread.key)}
+                  onClick={() => {
+                    if (thread.serviceRequestId) {
+                      setOpenedRequestId(thread.serviceRequestId);
+                    }
+
+                    setActiveThreadKey(thread.key);
+                  }}
                   className={cn(
                     "flex w-full items-start gap-3 border-b border-gray-50 px-4 py-3 text-left transition-colors hover:bg-lightgray",
                     active && "border-l-2 border-l-teal bg-teal/5",
                   )}
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-bold text-white">
-                    {thread.serviceRequestId ? "R" : "U"}
+                    {thread.participantName
+                      ? thread.participantName[0]?.toUpperCase()
+                      : thread.referenceNumber
+                        ? "R"
+                        : "U"}
                   </div>
 
                   <div className="min-w-0 flex-1">
@@ -528,7 +1056,9 @@ export function ChatWindow({
                     </div>
 
                     <p className="mt-0.5 truncate text-xs text-gray-400">
-                      {thread.lastMessage || thread.subtitle}
+                      {thread.participantName
+                        ? `${thread.participantName} · ${thread.subtitle}`
+                        : thread.subtitle}
                     </p>
 
                     {thread.lastDate ? (
@@ -547,7 +1077,11 @@ export function ChatWindow({
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-3 border-b border-gray-100 px-5 py-4">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-navy text-sm font-bold text-white">
-            {selectedThread?.serviceRequestId ? "R" : "U"}
+            {selectedThread?.participantName
+              ? selectedThread.participantName[0]?.toUpperCase()
+              : selectedThread?.referenceNumber
+                ? "R"
+                : "U"}
           </div>
 
           <div className="min-w-0">
@@ -555,17 +1089,25 @@ export function ChatWindow({
               {selectedTitle}
             </p>
 
-            <div className="mt-1 flex items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              {selectedThread?.referenceNumber ? (
+                <span className="rounded-full bg-gold/15 px-2 py-0.5 text-[11px] font-bold text-navy">
+                  {selectedThread.referenceNumber}
+                </span>
+              ) : null}
+
               <span
                 className={cn(
                   "rounded-full px-2 py-0.5 text-[11px] font-semibold",
-                  roleTone(roleLabel || user?.role),
+                  roleTone(activeRole),
                 )}
               >
-                {roleText(roleLabel || user?.role)}
+                {roleText(activeRole)}
               </span>
 
-              <span className="text-xs text-gray-400">{selectedSubtitle}</span>
+              <span className="truncate text-xs text-gray-400">
+                {selectedThread?.subtitle || "Choose a conversation."}
+              </span>
             </div>
           </div>
 
@@ -585,7 +1127,7 @@ export function ChatWindow({
                 Select a conversation to start chatting
               </p>
               <p className="mt-1 text-xs">
-                You can also open a chat using a recipient user ID.
+                Use the request reference number to open a request chat.
               </p>
             </div>
           </div>
@@ -603,14 +1145,16 @@ export function ChatWindow({
               ) : (
                 selectedMessages.map((message) => {
                   const isMe = message.sender_user_id === user?.id;
+                  const senderName = getSenderDisplayName(
+                    message,
+                    user?.id,
+                    selectedRequest,
+                  );
 
                   return (
                     <div
                       key={message.id}
-                      className={cn(
-                        "flex",
-                        isMe ? "justify-end" : "justify-start",
-                      )}
+                      className={cn("flex", isMe ? "justify-end" : "justify-start")}
                     >
                       <div
                         className={cn(
@@ -620,9 +1164,7 @@ export function ChatWindow({
                       >
                         <div className="flex items-center gap-1.5 px-1">
                           <span className="text-xs text-gray-400">
-                            {isMe
-                              ? "You"
-                              : `User ${shortId(message.sender_user_id)}`}
+                            {senderName}
                           </span>
                           <span className="text-xs text-gray-300">·</span>
                           <span className="text-xs text-gray-400">
@@ -632,7 +1174,7 @@ export function ChatWindow({
 
                         <div
                           className={cn(
-                            "rounded-2xl px-4 py-3 text-sm leading-relaxed",
+                            "whitespace-pre-line rounded-2xl px-4 py-3 text-sm leading-relaxed",
                             isMe
                               ? "rounded-tr-sm bg-navy text-white"
                               : "rounded-tl-sm bg-lightgray text-charcoal",
@@ -670,25 +1212,36 @@ export function ChatWindow({
                   }
                   className="rounded-lg border border-gray-200 px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-teal/30"
                 >
-                  <option value="conversation">Conversation</option>
-                  <option value="staff">Staff</option>
-                  <option value="admin">Admin only</option>
+                  {visibilityOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="flex items-end gap-2">
                 <button
                   type="button"
-                  onClick={() =>
-                    toast.info(
-                      "Use the Documents page to upload files. This message API currently supports text messages.",
-                    )
-                  }
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-400 transition-colors hover:bg-lightgray hover:text-navy"
-                  title="Attach file"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading || sending}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-gray-200 text-gray-400 transition-colors hover:bg-lightgray hover:text-navy disabled:opacity-50"
+                  title="Upload document"
                 >
-                  <Paperclip size={16} />
+                  {uploading ? (
+                    <RefreshCcw size={16} className="animate-spin" />
+                  ) : (
+                    <Paperclip size={16} />
+                  )}
                 </button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+                />
 
                 <textarea
                   value={text}
@@ -699,7 +1252,11 @@ export function ChatWindow({
                       void handleSend();
                     }
                   }}
-                  placeholder="Write your message..."
+                  placeholder={`Message ${
+                    selectedThread.participantName ||
+                    selectedThread.referenceNumber ||
+                    "user"
+                  }...`}
                   rows={2}
                   className="flex-1 resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
                 />

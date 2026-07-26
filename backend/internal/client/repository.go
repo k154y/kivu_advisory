@@ -70,7 +70,28 @@ func (r *PostgresRepository) Create(ctx context.Context, input CreateClientInput
 			website,
 			notes
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		VALUES (
+			$1,
+			NULLIF(BTRIM($2), ''),
+			NULLIF(BTRIM($3), ''),
+			NULLIF(BTRIM($4), ''),
+			NULLIF(BTRIM($5), ''),
+			NULLIF(BTRIM($6), ''),
+			COALESCE(NULLIF(BTRIM($7), ''), 'Rwanda'),
+			NULLIF(BTRIM($8), ''),
+			NULLIF(BTRIM($9), '')
+		)
+		ON CONFLICT (user_id)
+		DO UPDATE SET
+			company_name = COALESCE(NULLIF(BTRIM(EXCLUDED.company_name), ''), clients.company_name),
+			tin = COALESCE(NULLIF(BTRIM(EXCLUDED.tin), ''), clients.tin),
+			business_type = COALESCE(NULLIF(BTRIM(EXCLUDED.business_type), ''), clients.business_type),
+			address = COALESCE(NULLIF(BTRIM(EXCLUDED.address), ''), clients.address),
+			city = COALESCE(NULLIF(BTRIM(EXCLUDED.city), ''), clients.city),
+			country = COALESCE(NULLIF(BTRIM(EXCLUDED.country), ''), clients.country, 'Rwanda'),
+			website = COALESCE(NULLIF(BTRIM(EXCLUDED.website), ''), clients.website),
+			notes = COALESCE(NULLIF(BTRIM(EXCLUDED.notes), ''), clients.notes),
+			updated_at = NOW()
 		RETURNING %s
 	`, clientSelectColumns)
 

@@ -14,7 +14,6 @@ import {
   Mail,
   MapPin,
   MessageSquare,
-  MessagesSquare,
   Phone,
   RefreshCcw,
   ShieldCheck,
@@ -22,11 +21,20 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
+import { AccountantClientCredentialsCard } from "@/components/tax-credentials/AccountantClientCredentialsCard";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import type { AssignmentStatus, DocumentItem, Priority } from "@/types/api";
 
 type UnknownRecord = Record<string, unknown>;
+
+type AssignmentStatus =
+  | "assigned"
+  | "accepted"
+  | "in_progress"
+  | "completed"
+  | "cancelled";
+
+type Priority = "low" | "normal" | "high" | "urgent";
 
 type AssignmentDetail = {
   id: string;
@@ -43,6 +51,26 @@ type AssignmentDetail = {
   updated_at?: string;
   service_request?: UnknownRecord;
   request?: UnknownRecord;
+};
+
+type DocumentItem = {
+  id: string;
+  service_request_id?: string;
+  file_name?: string;
+  original_file_name?: string;
+  original_name?: string;
+  file_type?: string;
+  mime_type?: string;
+  document_type?: string;
+  visibility?: string;
+  description?: string;
+  uploaded_by?: string;
+  uploaded_by_user_id?: string;
+  uploader_name?: string;
+  uploader_role?: string;
+  created_at?: string;
+  updated_at?: string;
+  file_size_bytes?: number;
 };
 
 const STATUS_OPTIONS: AssignmentStatus[] = [
@@ -66,9 +94,13 @@ function getResponseData(response: unknown): unknown {
     data?: unknown;
     item?: unknown;
     assignment?: unknown;
+    service_request?: unknown;
+    request?: unknown;
   };
 
   if (objectResponse.assignment) return objectResponse.assignment;
+  if (objectResponse.service_request) return objectResponse.service_request;
+  if (objectResponse.request) return objectResponse.request;
   if (objectResponse.item) return objectResponse.item;
 
   if (objectResponse.data) {
@@ -79,9 +111,13 @@ function getResponseData(response: unknown): unknown {
         data?: unknown;
         item?: unknown;
         assignment?: unknown;
+        service_request?: unknown;
+        request?: unknown;
       };
 
       if (nestedObject.assignment) return nestedObject.assignment;
+      if (nestedObject.service_request) return nestedObject.service_request;
+      if (nestedObject.request) return nestedObject.request;
       if (nestedObject.item) return nestedObject.item;
       if (nestedObject.data) return nestedObject.data;
     }
@@ -99,6 +135,7 @@ function getAssignmentDetail(response: unknown): AssignmentDetail | null {
 
   if (Array.isArray(data)) {
     const first = data[0];
+
     return first && typeof first === "object"
       ? (first as AssignmentDetail)
       : null;
@@ -140,6 +177,10 @@ function readString(source: UnknownRecord | null | undefined, keys: string[]) {
     if (typeof value === "string" && value.trim()) {
       return value.trim();
     }
+
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return String(value);
+    }
   }
 
   return "";
@@ -151,6 +192,22 @@ function readNullableString(
 ) {
   const value = readString(source, keys);
   return value || undefined;
+}
+
+function readRecord(source: unknown, keys: string[]) {
+  if (!source || typeof source !== "object") return undefined;
+
+  const record = source as UnknownRecord;
+
+  for (const key of keys) {
+    const value = record[key];
+
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      return value as UnknownRecord;
+    }
+  }
+
+  return undefined;
 }
 
 function getRequestObject(detail: AssignmentDetail): UnknownRecord {
@@ -168,6 +225,97 @@ function getRequestObject(detail: AssignmentDetail): UnknownRecord {
   return {};
 }
 
+function resolveClientIdForCredentials(
+  detail: AssignmentDetail,
+  serviceRequest: UnknownRecord,
+) {
+  const detailRecord = detail as unknown as UnknownRecord;
+
+  const nestedRequest =
+    readRecord(detailRecord, ["service_request", "request"]) || serviceRequest;
+
+  const serviceRequestClient =
+    readRecord(serviceRequest, ["client", "client_profile", "clientProfile"]) ||
+    readRecord(serviceRequest, ["customer", "requester"]);
+
+  const detailClient =
+    readRecord(detailRecord, ["client", "client_profile", "clientProfile"]) ||
+    readRecord(detailRecord, ["customer", "requester"]);
+
+  const nestedRequestClient =
+    readRecord(nestedRequest, ["client", "client_profile", "clientProfile"]) ||
+    readRecord(nestedRequest, ["customer", "requester"]);
+
+  return (
+    readNullableString(serviceRequest, [
+      "client_id",
+      "client_profile_id",
+      "clientId",
+      "client_profileId",
+    ]) ||
+    readNullableString(serviceRequestClient, [
+      "id",
+      "client_id",
+      "client_profile_id",
+      "clientId",
+    ]) ||
+    readNullableString(detailRecord, [
+      "client_id",
+      "client_profile_id",
+      "clientId",
+      "client_profileId",
+    ]) ||
+    readNullableString(detailClient, [
+      "id",
+      "client_id",
+      "client_profile_id",
+      "clientId",
+    ]) ||
+    readNullableString(nestedRequest, [
+      "client_id",
+      "client_profile_id",
+      "clientId",
+      "client_profileId",
+    ]) ||
+    readNullableString(nestedRequestClient, [
+      "id",
+      "client_id",
+      "client_profile_id",
+      "clientId",
+    ])
+  );
+}
+
+function resolveReferenceNumber(
+  detail: AssignmentDetail,
+  serviceRequest: UnknownRecord,
+) {
+  const detailRecord = detail as unknown as UnknownRecord;
+  const nestedRequest =
+    readRecord(detailRecord, ["service_request", "request"]) || serviceRequest;
+
+  return (
+    readNullableString(serviceRequest, [
+      "reference_number",
+      "reference",
+      "service_request_reference_number",
+      "request_reference_number",
+    ]) ||
+    readNullableString(detailRecord, [
+      "reference_number",
+      "reference",
+      "service_request_reference_number",
+      "request_reference_number",
+    ]) ||
+    readNullableString(nestedRequest, [
+      "reference_number",
+      "reference",
+      "service_request_reference_number",
+      "request_reference_number",
+    ])
+  );
+}
+
 function formatDateShort(value?: string | null) {
   if (!value) return "Not set";
 
@@ -176,6 +324,22 @@ function formatDateShort(value?: string | null) {
       month: "short",
       day: "2-digit",
       year: "numeric",
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "Not set";
+
+  try {
+    return new Intl.DateTimeFormat("en-GB", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     }).format(new Date(value));
   } catch {
     return value;
@@ -232,6 +396,13 @@ function getSafeErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function getCreatedTime(value?: string) {
+  if (!value) return 0;
+
+  const time = new Date(value).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 function getTokenFromStorage() {
   if (typeof window === "undefined") return "";
 
@@ -280,6 +451,34 @@ function getTokenFromStorage() {
   return "";
 }
 
+function getDocumentFileName(document: DocumentItem) {
+  return (
+    document.original_file_name ||
+    document.original_name ||
+    document.file_name ||
+    "document"
+  );
+}
+
+function getDocumentTypeLabel(value?: string) {
+  if (!value) return "Document";
+  return formatTitle(value);
+}
+
+function getDocumentVisibilityLabel(value?: string) {
+  if (!value) return "Shared";
+  return formatTitle(value);
+}
+
+function formatFileSize(value?: number) {
+  if (!value || value <= 0) return "";
+
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+
+  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 async function downloadDocument(document: DocumentItem) {
   const token = getTokenFromStorage();
 
@@ -307,7 +506,7 @@ async function downloadDocument(document: DocumentItem) {
     const link = window.document.createElement("a");
 
     link.href = url;
-    link.download = document.original_file_name || document.file_name || "document";
+    link.download = getDocumentFileName(document);
     window.document.body.appendChild(link);
     link.click();
     link.remove();
@@ -327,6 +526,7 @@ export default function AccountantAssignedWorkDetailPage() {
   const [loading, setLoading] = useState(true);
   const [loadingDocuments, setLoadingDocuments] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const serviceRequest = useMemo(() => {
     if (!detail) return {};
@@ -338,7 +538,7 @@ export default function AccountantAssignedWorkDetailPage() {
 
     return (
       detail.service_request_id ||
-      readString(serviceRequest, ["id", "service_request_id"]) ||
+      readString(serviceRequest, ["id", "service_request_id", "request_id"]) ||
       ""
     );
   }, [detail, serviceRequest]);
@@ -350,10 +550,16 @@ export default function AccountantAssignedWorkDetailPage() {
 
     try {
       const result = await api.get<unknown>(
-        `/documents?service_request_id=${encodeURIComponent(requestId)}&page_size=100`,
+        `/documents?service_request_id=${encodeURIComponent(
+          requestId,
+        )}&page_size=100`,
       );
 
-      setDocuments(getListItems<DocumentItem>(result.data));
+      setDocuments(
+        getListItems<DocumentItem>(result.data).sort(
+          (a, b) => getCreatedTime(b.created_at) - getCreatedTime(a.created_at),
+        ),
+      );
     } catch {
       setDocuments([]);
     } finally {
@@ -362,14 +568,19 @@ export default function AccountantAssignedWorkDetailPage() {
   }, []);
 
   const load = useCallback(async () => {
+    if (!assignmentId) return;
+
     setLoading(true);
+    setError(null);
 
     try {
       let loaded: AssignmentDetail | null = null;
 
       try {
         const result = await api.get<unknown>(
-          `/accountant/assignments/detail?id=${encodeURIComponent(assignmentId)}`,
+          `/accountant/assignments/detail?id=${encodeURIComponent(
+            assignmentId,
+          )}`,
         );
 
         loaded = getAssignmentDetail(result.data);
@@ -382,19 +593,31 @@ export default function AccountantAssignedWorkDetailPage() {
         loaded = items.find((item) => item.id === assignmentId) || null;
       }
 
+      if (!loaded) {
+        throw new Error("Assigned request could not be found.");
+      }
+
       setDetail(loaded);
 
-      const requestObject = loaded ? getRequestObject(loaded) : {};
+      const requestObject = getRequestObject(loaded);
       const requestId =
-        loaded?.service_request_id ||
-        readString(requestObject, ["id", "service_request_id"]);
+        loaded.service_request_id ||
+        readString(requestObject, ["id", "service_request_id", "request_id"]);
 
       if (requestId) {
         await loadDocuments(requestId);
+      } else {
+        setDocuments([]);
       }
-    } catch (error) {
-      toast.error(getSafeErrorMessage(error, "Failed to load assigned request."));
+    } catch (loadError) {
       setDetail(null);
+      setDocuments([]);
+      setError(
+        getSafeErrorMessage(loadError, "Failed to load assigned request."),
+      );
+      toast.error(
+        getSafeErrorMessage(loadError, "Failed to load assigned request."),
+      );
     } finally {
       setLoading(false);
     }
@@ -404,7 +627,7 @@ export default function AccountantAssignedWorkDetailPage() {
     void load();
   }, [load]);
 
-  const handleStatusChange = async (status: AssignmentStatus) => {
+  const handleStatusChange = async (nextStatus: AssignmentStatus) => {
     if (!detail) return;
 
     setUpdatingStatus(true);
@@ -413,7 +636,7 @@ export default function AccountantAssignedWorkDetailPage() {
       await api.patch(
         `/accountant/assignments/status?id=${encodeURIComponent(detail.id)}`,
         {
-          status,
+          status: nextStatus,
         },
       );
 
@@ -421,14 +644,20 @@ export default function AccountantAssignedWorkDetailPage() {
         current
           ? {
               ...current,
-              status,
+              status: nextStatus,
+              completed_at:
+                nextStatus === "completed"
+                  ? new Date().toISOString()
+                  : current.completed_at,
             }
           : current,
       );
 
       toast.success("Assignment status updated.");
-    } catch (error) {
-      toast.error(getSafeErrorMessage(error, "Failed to update status."));
+    } catch (statusError) {
+      toast.error(
+        getSafeErrorMessage(statusError, "Failed to update assignment status."),
+      );
     } finally {
       setUpdatingStatus(false);
     }
@@ -436,30 +665,33 @@ export default function AccountantAssignedWorkDetailPage() {
 
   if (loading) {
     return (
-      <div className="flex h-64 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+      <div className="flex min-h-[420px] items-center justify-center">
+        <div className="text-center">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-navy border-t-transparent" />
+          <p className="text-sm text-gray-500">Loading assigned request...</p>
+        </div>
       </div>
     );
   }
 
   if (!detail) {
     return (
-      <div className="rounded-xl border border-gray-100 bg-white p-12 text-center">
+      <div className="rounded-2xl border border-gray-100 bg-white p-10 text-center">
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-lightgray">
           <Briefcase size={24} className="text-gray-300" />
         </div>
 
         <h1 className="text-lg font-bold text-navy">
-          Assigned request not found
+          Assigned request unavailable
         </h1>
 
-        <p className="mt-2 text-sm text-gray-400">
-          This request may not be assigned to you, or it may have been removed.
+        <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
+          {error || "This assigned work item could not be found."}
         </p>
 
         <Link
           href="/accountant/assigned-work"
-          className="mt-5 inline-flex items-center gap-2 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-navy-700"
+          className="mt-6 inline-flex items-center gap-2 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-teal"
         >
           <ArrowLeft size={15} />
           Back to assigned work
@@ -469,19 +701,26 @@ export default function AccountantAssignedWorkDetailPage() {
   }
 
   const title =
-    readString(serviceRequest, ["title", "service_type", "service_title"]) ||
-    "Assigned Request";
+    readString(serviceRequest, [
+      "title",
+      "service_name",
+      "service_title",
+      "service_type",
+      "request_title",
+    ]) || "Assigned Request";
 
-  const description =
-    readString(serviceRequest, ["description", "message", "body"]) ||
-    detail.notes ||
-    "No request description provided.";
+  const description = readString(serviceRequest, [
+    "description",
+    "summary",
+    "message",
+    "body",
+  ]);
 
   const clientName =
     readString(serviceRequest, [
       "requester_name",
-      "full_name",
       "client_name",
+      "full_name",
       "name",
     ]) || "Client";
 
@@ -514,12 +753,12 @@ export default function AccountantAssignedWorkDetailPage() {
     "contact_method",
   ]);
 
-  const referenceNumber = readNullableString(serviceRequest, [
-    "reference_number",
-    "reference",
-  ]);
+  const referenceNumber = resolveReferenceNumber(detail, serviceRequest);
+
+  const clientId = resolveClientIdForCredentials(detail, serviceRequest);
 
   const requestStatus = readNullableString(serviceRequest, ["status"]);
+
   const priority =
     detail.priority ||
     readString(serviceRequest, ["priority", "urgency"]) ||
@@ -530,25 +769,46 @@ export default function AccountantAssignedWorkDetailPage() {
     detail.created_at;
 
   const dueDate = detail.due_date;
+
   const clientUserId = readNullableString(serviceRequest, [
     "client_user_id",
-    "client_id",
+    "requester_user_id",
     "user_id",
   ]);
 
-  const clientChatHref = clientUserId
-    ? `/accountant/messages?with=${encodeURIComponent(clientUserId)}`
-    : serviceRequestId
-      ? `/accountant/messages?service_request_id=${encodeURIComponent(serviceRequestId)}`
-      : "/accountant/messages";
+  const messageParams = new URLSearchParams();
+
+  if (serviceRequestId) {
+    messageParams.set("service_request_id", serviceRequestId);
+  }
+
+  if (referenceNumber) {
+    messageParams.set("reference", referenceNumber);
+  }
 
   const requestChatHref = serviceRequestId
-    ? `/accountant/messages?service_request_id=${encodeURIComponent(serviceRequestId)}`
+    ? `/accountant/messages?${messageParams.toString()}`
     : "/accountant/messages";
 
-  const statusOptions = STATUS_OPTIONS.includes(
-    detail.status as AssignmentStatus,
-  )
+  const clientChatHref = clientUserId
+    ? `/accountant/messages?with=${encodeURIComponent(clientUserId)}`
+    : requestChatHref;
+
+  const documentParams = new URLSearchParams();
+
+  if (serviceRequestId) {
+    documentParams.set("service_request_id", serviceRequestId);
+  }
+
+  if (referenceNumber) {
+    documentParams.set("reference", referenceNumber);
+  }
+
+  const documentsHref = serviceRequestId
+    ? `/accountant/documents?${documentParams.toString()}`
+    : "/accountant/documents";
+
+  const statusOptions = STATUS_OPTIONS.includes(detail.status as AssignmentStatus)
     ? STATUS_OPTIONS
     : [detail.status as AssignmentStatus, ...STATUS_OPTIONS];
 
@@ -582,301 +842,444 @@ export default function AccountantAssignedWorkDetailPage() {
               {priority}
             </span>
 
-            {referenceNumber ? (
-              <span className="rounded-full bg-lightgray px-3 py-1 text-xs font-semibold text-gray-500">
-                Ref: {referenceNumber}
-              </span>
-            ) : null}
+            <span className="rounded-full border border-navy/10 bg-lightgray px-3 py-1 text-xs font-bold text-navy">
+              {referenceNumber || serviceRequestId || detail.id}
+            </span>
           </div>
 
           <h1 className="truncate text-xl font-bold text-navy">
             {formatTitle(title)}
           </h1>
 
-          <p className="mt-1 text-sm text-gray-400">
-            {clientName} · {formatDateShort(createdAt)}
+          <p className="mt-1 text-sm text-gray-500">
+            Assigned work detail, request communication, documents, and client
+            credentials.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href={clientChatHref}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-teal/30 px-3 py-2 text-xs font-semibold text-teal transition-colors hover:bg-teal hover:text-white"
-          >
-            <MessagesSquare size={14} />
-            Client
-          </Link>
-
-          <Link
-            href={requestChatHref}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-navy/20 px-3 py-2 text-xs font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
-          >
-            <MessageSquare size={14} />
-            Request Thread
-          </Link>
-
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-500 transition-colors hover:bg-lightgray hover:text-navy"
-          >
-            <RefreshCcw size={13} />
-            Refresh
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-lightgray"
+        >
+          <RefreshCcw size={15} />
+          Refresh
+        </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-5 lg:col-span-2">
-          <div className="rounded-xl border border-gray-100 bg-white p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-navy">
-              <UserRound size={16} className="text-teal" />
-              Client Information
-            </h2>
+      <div className="mb-6 grid gap-4 md:grid-cols-4">
+        <InfoCard
+          icon={<Briefcase size={18} />}
+          label="Assignment"
+          value={getStatusLabel(detail.status)}
+        />
 
-            <div className="space-y-3">
+        <InfoCard
+          icon={<ShieldCheck size={18} />}
+          label="Priority"
+          value={formatTitle(priority)}
+        />
+
+        <InfoCard
+          icon={<CalendarClock size={18} />}
+          label="Due Date"
+          value={formatDateShort(dueDate)}
+        />
+
+        <InfoCard
+          icon={<Clock size={18} />}
+          label="Created"
+          value={formatDateShort(createdAt)}
+        />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="space-y-6">
+          <section className="rounded-xl border border-gray-100 bg-white p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-semibold text-charcoal">
-                  {clientName}
+                <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-gold">
+                  Request Details
                 </p>
 
-                {companyName ? (
-                  <p className="mt-0.5 text-xs text-gray-400">{companyName}</p>
-                ) : null}
+                <h2 className="text-lg font-bold text-navy">
+                  {formatTitle(title)}
+                </h2>
+
+                {description ? (
+                  <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-gray-500">
+                    {description}
+                  </p>
+                ) : (
+                  <p className="mt-2 text-sm text-gray-400">
+                    No request description was provided.
+                  </p>
+                )}
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                {phone ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-lightgray px-3 py-2 text-xs text-gray-600">
-                    <Phone size={13} className="text-teal" />
-                    {phone}
-                  </div>
-                ) : null}
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Link
+                  href={requestChatHref}
+                  className="inline-flex items-center gap-2 rounded-lg border border-teal/20 bg-teal/10 px-3 py-2 text-xs font-semibold text-teal hover:bg-teal hover:text-white"
+                >
+                  <MessageSquare size={14} />
+                  Messages
+                </Link>
 
-                {email ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-lightgray px-3 py-2 text-xs text-gray-600">
-                    <Mail size={13} className="text-teal" />
-                    {email}
-                  </div>
-                ) : null}
-
-                {location ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-lightgray px-3 py-2 text-xs text-gray-600">
-                    <MapPin size={13} className="text-teal" />
-                    {location}
-                  </div>
-                ) : null}
-
-                {preferredContactMethod ? (
-                  <div className="flex items-center gap-2 rounded-lg bg-lightgray px-3 py-2 text-xs text-gray-600">
-                    <Phone size={13} className="text-teal" />
-                    Preferred: {formatTitle(preferredContactMethod)}
-                  </div>
-                ) : null}
+                <Link
+                  href={documentsHref}
+                  className="inline-flex items-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-navy hover:bg-gold/20"
+                >
+                  <FileText size={14} />
+                  Documents
+                </Link>
               </div>
             </div>
-          </div>
 
-          <div className="rounded-xl border border-gray-100 bg-white p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-navy">
-              <Briefcase size={16} className="text-teal" />
-              Request Details
-            </h2>
+            <div className="grid gap-4 border-t border-gray-100 pt-5 sm:grid-cols-2">
+              <DetailItem label="Request Reference" value={referenceNumber || "Not available"} />
+              <DetailItem label="Service Request ID" value={serviceRequestId || "Not available"} />
+              <DetailItem label="Request Status" value={getStatusLabel(requestStatus)} />
+              <DetailItem label="Preferred Contact" value={formatTitle(preferredContactMethod)} />
+            </div>
+          </section>
 
-            <div className="grid gap-3 sm:grid-cols-3">
-              <InfoBox
-                icon={<CalendarClock size={15} />}
-                label="Submitted"
-                value={formatDateShort(createdAt)}
-              />
+          <section className="rounded-xl border border-gray-100 bg-white p-5">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-bold text-navy">Assignment Status</h2>
+                <p className="mt-1 text-xs text-gray-400">
+                  Update your work progress for this assigned request.
+                </p>
+              </div>
 
-              <InfoBox
-                icon={<Clock size={15} />}
-                label="Due Date"
-                value={formatDateShort(dueDate)}
-              />
-
-              <InfoBox
-                icon={<CheckCircle2 size={15} />}
-                label="Request Status"
-                value={requestStatus ? getStatusLabel(requestStatus) : "Not set"}
-              />
+              <select
+                value={detail.status}
+                disabled={updatingStatus}
+                onChange={(event) =>
+                  void handleStatusChange(event.target.value as AssignmentStatus)
+                }
+                className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30 disabled:opacity-50"
+              >
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {getStatusLabel(status)}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="mt-4 rounded-xl bg-lightgray p-4">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                Description
-              </p>
-
-              <p className="whitespace-pre-line text-sm leading-relaxed text-charcoal">
-                {description}
-              </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <DetailItem label="Started" value={formatDateTime(detail.started_at)} />
+              <DetailItem label="Completed" value={formatDateTime(detail.completed_at)} />
+              <DetailItem label="Updated" value={formatDateTime(detail.updated_at)} />
             </div>
 
-            {detail.notes || detail.internal_notes ? (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {detail.notes ? (
-                  <div className="rounded-xl border border-gray-100 p-4">
-                    <p className="mb-1 text-xs font-semibold text-gray-400">
-                      Assignment Notes
-                    </p>
-                    <p className="text-sm leading-relaxed text-charcoal">
-                      {detail.notes}
-                    </p>
-                  </div>
-                ) : null}
-
-                {detail.internal_notes ? (
-                  <div className="rounded-xl border border-gray-100 p-4">
-                    <p className="mb-1 text-xs font-semibold text-gray-400">
-                      Internal Notes
-                    </p>
-                    <p className="text-sm leading-relaxed text-charcoal">
-                      {detail.internal_notes}
-                    </p>
-                  </div>
-                ) : null}
+            {detail.notes ? (
+              <div className="mt-5 rounded-xl border border-gray-100 bg-lightgray p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+                  Assignment Notes
+                </p>
+                <p className="mt-2 whitespace-pre-line text-sm text-navy">
+                  {detail.notes}
+                </p>
               </div>
             ) : null}
-          </div>
 
-          <div className="rounded-xl border border-gray-100 bg-white p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-navy">
-              <MessagesSquare size={16} className="text-teal" />
-              Quick Messages
-            </h2>
+            {detail.internal_notes ? (
+              <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">
+                  Internal Notes
+                </p>
+                <p className="mt-2 whitespace-pre-line text-sm text-amber-800">
+                  {detail.internal_notes}
+                </p>
+              </div>
+            ) : null}
+          </section>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+          <section className="rounded-xl border border-gray-100 bg-white">
+            <div className="flex flex-col gap-3 border-b border-gray-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-bold text-navy">Documents</h2>
+                <p className="mt-1 text-xs text-gray-400">
+                  Files attached to this request reference.
+                </p>
+              </div>
+
               <Link
-                href={clientChatHref}
-                className="flex items-center gap-3 rounded-xl border border-teal/20 bg-teal/5 px-4 py-3 text-sm font-semibold text-teal transition-colors hover:bg-teal hover:text-white"
+                href={documentsHref}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-lightgray"
               >
-                <MessagesSquare size={17} />
-                Chat with {clientName}
+                Open documents folder
               </Link>
-
-              <Link
-                href={requestChatHref}
-                className="flex items-center gap-3 rounded-xl border border-navy/10 bg-navy/5 px-4 py-3 text-sm font-semibold text-navy transition-colors hover:bg-navy hover:text-white"
-              >
-                <MessageSquare size={17} />
-                Open Request Thread
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-5">
-          <div className="rounded-xl border border-gray-100 bg-white p-5">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-navy">
-              <ShieldCheck size={16} className="text-teal" />
-              Update Progress
-            </h2>
-
-            <label className="mb-1.5 block text-xs font-medium text-gray-500">
-              Assignment Status
-            </label>
-
-            <select
-              value={detail.status}
-              disabled={updatingStatus}
-              onChange={(event) =>
-                void handleStatusChange(event.target.value as AssignmentStatus)
-              }
-              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal/30 disabled:opacity-50"
-            >
-              {statusOptions.map((status) => (
-                <option key={status} value={status}>
-                  {getStatusLabel(status)}
-                </option>
-              ))}
-            </select>
-
-            <p className="mt-3 text-xs leading-relaxed text-gray-400">
-              Update only the progress of work assigned to you. Final closure
-              and client-wide changes remain controlled by admin permissions.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-gray-100 bg-white p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="flex items-center gap-2 text-sm font-bold text-navy">
-                <FileText size={16} className="text-teal" />
-                Documents
-              </h2>
-
-              <span className="rounded-full bg-lightgray px-2 py-1 text-xs text-gray-500">
-                {documents.length}
-              </span>
             </div>
 
             {loadingDocuments ? (
-              <div className="flex justify-center py-8">
-                <div className="h-6 w-6 animate-spin rounded-full border-2 border-teal border-t-transparent" />
+              <div className="p-8 text-center">
+                <div className="mx-auto h-8 w-8 animate-spin rounded-full border-2 border-navy border-t-transparent" />
               </div>
             ) : documents.length === 0 ? (
-              <div className="rounded-xl bg-lightgray p-5 text-center">
-                <FileText size={24} className="mx-auto mb-2 text-gray-300" />
-                <p className="text-sm font-medium text-gray-500">
-                  No documents yet
-                </p>
-                <p className="mt-1 text-xs text-gray-400">
-                  Documents linked to this request will appear here.
+              <div className="p-8 text-center">
+                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-lightgray">
+                  <FileText size={24} className="text-gray-300" />
+                </div>
+
+                <h3 className="font-semibold text-navy">No documents yet</h3>
+
+                <p className="mx-auto mt-2 max-w-md text-sm text-gray-400">
+                  Documents uploaded by the client, admin, or accountant for this
+                  request will appear here.
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {documents.map((document) => (
-                  <button
-                    key={document.id}
-                    type="button"
-                    onClick={() => void downloadDocument(document)}
-                    className="flex w-full items-center gap-3 rounded-lg border border-gray-100 px-3 py-3 text-left transition-colors hover:bg-lightgray"
-                  >
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-lightgray text-navy">
-                      <FileText size={16} />
-                    </div>
+              <div className="divide-y divide-gray-50">
+                {documents.map((document) => {
+                  const size = formatFileSize(document.file_size_bytes);
 
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-charcoal">
-                        {document.original_file_name || document.file_name}
-                      </p>
+                  return (
+                    <article
+                      key={document.id}
+                      className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-lightgray px-2.5 py-1 text-xs font-semibold text-navy">
+                            {getDocumentTypeLabel(document.document_type)}
+                          </span>
 
-                      <p className="mt-0.5 text-xs text-gray-400">
-                        {formatTitle(document.document_type)} ·{" "}
-                        {formatDateShort(document.created_at)}
-                      </p>
-                    </div>
+                          <span className="rounded-full bg-teal/10 px-2.5 py-1 text-xs font-semibold text-teal">
+                            {getDocumentVisibilityLabel(document.visibility)}
+                          </span>
+                        </div>
 
-                    <Download size={15} className="shrink-0 text-gray-300" />
-                  </button>
-                ))}
+                        <h3 className="truncate text-sm font-bold text-navy">
+                          {getDocumentFileName(document)}
+                        </h3>
+
+                        <p className="mt-1 text-xs text-gray-400">
+                          {formatDateShort(document.created_at)}
+                          {size ? ` · ${size}` : ""}
+                          {document.uploader_name
+                            ? ` · Uploaded by ${document.uploader_name}`
+                            : ""}
+                        </p>
+
+                        {document.description ? (
+                          <p className="mt-2 line-clamp-2 text-sm text-gray-500">
+                            {document.description}
+                          </p>
+                        ) : null}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => void downloadDocument(document)}
+                        className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white hover:bg-teal"
+                      >
+                        <Download size={14} />
+                        Download
+                      </button>
+                    </article>
+                  );
+                })}
               </div>
             )}
+          </section>
 
-            <p className="mt-4 text-xs leading-relaxed text-gray-400">
-              Uploading accountant deliverables can be added here after we
-              confirm your current document upload helper or API wrapper.
-            </p>
-          </div>
+          <AccountantClientCredentialsCard
+            clientId={clientId}
+            serviceRequestId={serviceRequestId}
+            referenceNumber={referenceNumber}
+          />
         </div>
+
+        <aside className="space-y-6">
+          <section className="rounded-xl border border-gray-100 bg-white p-5">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-navy/5 text-navy">
+                <UserRound size={18} />
+              </div>
+
+              <div>
+                <h2 className="font-bold text-navy">Client Information</h2>
+                <p className="text-xs text-gray-400">Assigned request client</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <DetailItem label="Client" value={clientName} />
+
+              {companyName ? (
+                <DetailItem label="Company" value={companyName} />
+              ) : null}
+
+              <DetailItem
+                label="Client ID for credentials"
+                value={clientId || "Not provided by assignment response"}
+              />
+
+              {email ? (
+                <ContactItem icon={<Mail size={15} />} value={email} />
+              ) : null}
+
+              {phone ? (
+                <ContactItem icon={<Phone size={15} />} value={phone} />
+              ) : null}
+
+              {location ? (
+                <ContactItem icon={<MapPin size={15} />} value={location} />
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2">
+              <Link
+                href={requestChatHref}
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-navy px-3 py-2 text-sm font-semibold text-white hover:bg-teal"
+              >
+                <MessageSquare size={15} />
+                Request messages
+              </Link>
+
+              <Link
+                href={clientChatHref}
+                className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-lightgray"
+              >
+                <Mail size={15} />
+                Client conversation
+              </Link>
+            </div>
+          </section>
+
+          <section className="rounded-xl border border-gray-100 bg-white p-5">
+            <h2 className="mb-4 font-bold text-navy">Timeline</h2>
+
+            <div className="space-y-4">
+              <TimelineItem
+                icon={<CalendarClock size={14} />}
+                label="Request Created"
+                value={formatDateTime(createdAt)}
+              />
+
+              <TimelineItem
+                icon={<Briefcase size={14} />}
+                label="Assigned"
+                value={formatDateTime(detail.created_at)}
+              />
+
+              <TimelineItem
+                icon={<Clock size={14} />}
+                label="Due Date"
+                value={formatDateTime(dueDate)}
+              />
+
+              <TimelineItem
+                icon={<CheckCircle2 size={14} />}
+                label="Completed"
+                value={formatDateTime(detail.completed_at)}
+              />
+            </div>
+          </section>
+
+          {!clientId ? (
+            <section className="rounded-xl border border-amber-100 bg-amber-50 p-5">
+              <h2 className="font-bold text-amber-800">
+                Client credentials cannot load
+              </h2>
+
+              <p className="mt-2 text-sm leading-relaxed text-amber-700">
+                The accountant credential endpoint requires the real client_id,
+                but this assignment response does not expose it. Backend should
+                include client_id and reference_number in the accountant
+                assignment/detail response.
+              </p>
+            </section>
+          ) : null}
+        </aside>
       </div>
     </div>
   );
 }
 
-type InfoBoxProps = {
+function InfoCard({
+  icon,
+  label,
+  value,
+}: {
   icon: React.ReactNode;
   label: string;
   value: string;
-};
-
-function InfoBox({ icon, label, value }: InfoBoxProps) {
+}) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-4">
-      <div className="mb-2 flex items-center gap-2 text-teal">{icon}</div>
-      <p className="text-xs text-gray-400">{label}</p>
-      <p className="mt-1 text-sm font-semibold text-charcoal">{value}</p>
+    <section className="rounded-xl border border-gray-100 bg-white p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-lightgray text-navy">
+          {icon}
+        </div>
+
+        <div className="min-w-0">
+          <p className="truncate text-sm font-bold text-navy">{value}</p>
+          <p className="text-xs text-gray-400">{label}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function DetailItem({
+  label,
+  value,
+}: {
+  label: string;
+  value?: string | null;
+}) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+        {label}
+      </p>
+
+      <p className="mt-1 break-words text-sm font-medium text-navy">
+        {value || "—"}
+      </p>
+    </div>
+  );
+}
+
+function ContactItem({
+  icon,
+  value,
+}: {
+  icon: React.ReactNode;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm text-gray-600">
+      <span className="text-teal">{icon}</span>
+      <span className="min-w-0 break-all">{value}</span>
+    </div>
+  );
+}
+
+function TimelineItem({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-lightgray text-teal">
+        {icon}
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-navy">{label}</p>
+        <p className="mt-0.5 text-xs text-gray-400">{value}</p>
+      </div>
     </div>
   );
 }
