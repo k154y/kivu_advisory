@@ -162,6 +162,11 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		log.Printf("admin bootstrap failed: %v", err)
 	}
 
+	serviceRequestService.SetNotificationService(notificationService)
+	serviceRequestService.SetAdminNotificationRecipient(
+		adminServiceRequestNotificationRecipient(bootstrapCtx, options.DatabasePool, options.Config),
+	)
+
 	authService := auth.NewService(userService, tokenManager, options.Config.Password.MinLength)
 	authService.SetClientService(clientService)
 	authService.SetVisitorRequestClaimer(serviceRequestService)
@@ -548,4 +553,37 @@ func SecurityHeaders(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func adminServiceRequestNotificationRecipient(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg *config.Config,
+) servicerequest.AdminNotificationRecipient {
+	if pool == nil || cfg == nil || cfg.Admin.Email == "" {
+		return servicerequest.AdminNotificationRecipient{}
+	}
+
+	var recipient servicerequest.AdminNotificationRecipient
+
+	err := pool.QueryRow(ctx, `
+		SELECT
+			id,
+			email,
+			COALESCE(phone, '')
+		FROM users
+		WHERE LOWER(email) = LOWER($1)
+			AND role = 'admin'
+		LIMIT 1
+	`, cfg.Admin.Email).Scan(
+		&recipient.UserID,
+		&recipient.Email,
+		&recipient.Phone,
+	)
+	if err != nil {
+		log.Printf("admin notification recipient not found for %s: %v", cfg.Admin.Email, err)
+		return servicerequest.AdminNotificationRecipient{}
+	}
+
+	return recipient
 }
