@@ -167,6 +167,11 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		adminServiceRequestNotificationRecipient(bootstrapCtx, options.DatabasePool, options.Config),
 	)
 
+	consultationService.SetNotificationService(notificationService)
+	consultationService.SetAdminNotificationRecipient(
+		adminConsultationNotificationRecipient(bootstrapCtx, options.DatabasePool, options.Config),
+	)
+
 	authService := auth.NewService(userService, tokenManager, options.Config.Password.MinLength)
 	authService.SetClientService(clientService)
 	authService.SetVisitorRequestClaimer(serviceRequestService)
@@ -583,6 +588,39 @@ func adminServiceRequestNotificationRecipient(
 	if err != nil {
 		log.Printf("admin notification recipient not found for %s: %v", cfg.Admin.Email, err)
 		return servicerequest.AdminNotificationRecipient{}
+	}
+
+	return recipient
+}
+
+func adminConsultationNotificationRecipient(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg *config.Config,
+) consultation.AdminNotificationRecipient {
+	if pool == nil || cfg == nil || cfg.Admin.Email == "" {
+		return consultation.AdminNotificationRecipient{}
+	}
+
+	var recipient consultation.AdminNotificationRecipient
+
+	err := pool.QueryRow(ctx, `
+		SELECT
+			id,
+			email,
+			COALESCE(phone, '')
+		FROM users
+		WHERE LOWER(email) = LOWER($1)
+			AND role = 'admin'
+		LIMIT 1
+	`, cfg.Admin.Email).Scan(
+		&recipient.UserID,
+		&recipient.Email,
+		&recipient.Phone,
+	)
+	if err != nil {
+		log.Printf("admin consultation notification recipient not found for %s: %v", cfg.Admin.Email, err)
+		return consultation.AdminNotificationRecipient{}
 	}
 
 	return recipient
