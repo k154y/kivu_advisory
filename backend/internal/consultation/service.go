@@ -2,14 +2,16 @@ package consultation
 
 import (
 	"context"
-	"strings"
 	"net/http"
+	"strings"
 
 	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 )
 
 type Service struct {
-	repo Repository
+	repo                       Repository
+	notificationService        NotificationService
+	adminNotificationRecipient AdminNotificationRecipient
 }
 
 func NewService(repo Repository) *Service {
@@ -33,6 +35,8 @@ func (s *Service) CreateWebsite(ctx context.Context, input CreateConsultationInp
 	if err != nil {
 		return nil, err
 	}
+
+	s.notifyAdminAboutNewConsultation(ctx, createdConsultation)
 
 	publicConsultation := publicConsultationForVisitor(createdConsultation)
 
