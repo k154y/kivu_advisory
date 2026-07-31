@@ -20,9 +20,11 @@ type PermissionChecker interface {
 }
 
 type Service struct {
-	repo              Repository
-	storage           Storage
-	permissionChecker PermissionChecker
+	repo                 Repository
+	storage              Storage
+	permissionChecker    PermissionChecker
+	notificationService  NotificationService
+	notificationResolver NotificationResolver
 }
 
 type Actor struct {
@@ -108,6 +110,8 @@ func (s *Service) Upload(ctx context.Context, actor Actor, input UploadDocumentI
 		_ = s.storage.Delete(ctx, savedFile.StorageKey)
 		return nil, err
 	}
+
+	s.notifyAfterUpload(ctx, actor, createdDocument)
 
 	publicDocument := createdDocument.Public()
 

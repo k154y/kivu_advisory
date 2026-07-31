@@ -91,6 +91,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	documentRepository := document.NewPostgresRepository(options.DatabasePool)
 	documentStorage := newDocumentStorage(options.Config)
 	documentAccessChecker := document.NewAccessChecker(serviceRequestRepository, assignmentRepository)
+	documentNotificationResolver := document.NewPostgresNotificationResolver(options.DatabasePool, options.Config.Admin.Email)
 	documentService := document.NewService(documentRepository, documentStorage, documentAccessChecker)
 
 	consultationRepository := consultation.NewPostgresRepository(options.DatabasePool)
@@ -175,6 +176,9 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 
 	assignmentService.SetNotificationService(notificationService)
 	assignmentService.SetAccountantRecipientResolver(assignmentRecipientRepository)
+
+	documentService.SetNotificationService(notificationService)
+	documentService.SetNotificationResolver(documentNotificationResolver)
 
 	authService := auth.NewService(userService, tokenManager, options.Config.Password.MinLength)
 	authService.SetClientService(clientService)
