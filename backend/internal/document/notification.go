@@ -8,6 +8,7 @@ import (
 	"time"
 
 	notificationpkg "github.com/kyves/kivu-advisory/backend/internal/notification"
+	apperrors "github.com/kyves/kivu-advisory/backend/pkg/errors"
 )
 
 type NotificationService interface {
@@ -214,6 +215,124 @@ func (s *Service) notifyClientAboutFinalDocument(
 	})
 	if err != nil {
 		log.Printf("failed to notify client about final document %s: %v", item.ID, err)
+	}
+}
+
+type RequestClientUploadInput struct {
+	ServiceRequestID string
+	DocumentName     string
+	Message          string
+	Urgency          string
+}
+
+func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input RequestClientUploadInput) error {
+	if s == nil || s.notificationService == nil || s.notificationResolver == nil {
+		return apperrors.Internal("document notification service is not initialized")
+	}
+
+	actor = normalizeActor(actor)
+	if err := validateActor(actor); err != nil {
+		return err
+	}
+
+	if actor.Role != roleAdmin {
+		return apperrors.Forbidden("only admin can request client document uploads")
+	}
+
+	input.ServiceRequestID = strings.TrimSpace(input.ServiceRequestID)
+	input.DocumentName = strings.TrimSpace(input.DocumentName)
+	input.Message = strings.TrimSpace(input.Message)
+	input.Urgency = strings.TrimSpace(strings.ToLower(input.Urgency))
+
+	if input.ServiceRequestID == "" {
+		return apperrors.InvalidInput("service request id is required")
+	}
+
+	if input.DocumentName == "" {
+		return apperrors.InvalidInput("document name is required")
+	}
+
+	if input.Message == "" {
+		input.Message = "Please upload the requested document so our team can continue processing your service request."
+	}
+
+	requestContext, err := s.notificationResolver.FindServiceRequestNotificationContext(ctx, input.ServiceRequestID)
+	if err != nil {
+		return err
+	}
+
+	recipient := normalizeNotificationRecipient(NotificationRecipient{
+		UserID:   requestContext.ClientUserID,
+		FullName: requestContext.ClientFullName,
+		Email:    requestContext.ClientEmail,
+		Phone:    requestContext.ClientPhone,
+	})
+
+	if recipient.UserID == "" || recipient.Email == "" {
+		return apperrors.InvalidInput("this service request is not linked to a client account with an email")
+	}
+
+	referenceNumber := normalizedReferenceNumber(requestContext)
+
+	clientName := recipient.FullName
+	if clientName == "" {
+		clientName = "Client"
+	}
+
+	title := fmt.Sprintf("Document required for %s", referenceNumber)
+
+	body := fmt.Sprintf(
+		"Kivu Advisory requests you to upload: %s.",
+		input.DocumentName,
+	)
+
+	emailBody := fmt.Sprintf(
+		"Hello %s,\n\nKivu Advisory requests you to upload a document for your service request.\n\nReference: %s\nRequest title: %s\nRequired document: %s\nUrgency: %s\n\nMessage:\n%s\n\nPlease log in to your client dashboard and upload the requested document.",
+		clientName,
+		referenceNumber,
+		strings.TrimSpace(requestContext.Title),
+		input.DocumentName,
+		normalizedUploadRequestUrgency(input.Urgency),
+		input.Message,
+	)
+
+	_, err = s.notificationService.NotifyUser(ctx, notificationpkg.NotifyUserInput{
+		UserID:           recipient.UserID,
+		UserEmail:        recipient.Email,
+		UserPhone:        recipient.Phone,
+		Title:            title,
+		Body:             body,
+		NotificationType: "system",
+		EntityType:       "service_request",
+		EntityID:         requestContext.ID,
+		ActionURL:        "/client/service-requests",
+		Channels: []string{
+			notificationpkg.ChannelInApp,
+			notificationpkg.ChannelEmail,
+			notificationpkg.ChannelSMS,
+		},
+		EmailSubject: fmt.Sprintf("Document required for Kivu Advisory request %s", referenceNumber),
+		EmailBody:    emailBody,
+		SMSBody:      fmt.Sprintf("Kivu Advisory: please upload %s for request %s. Check your client dashboard.", input.DocumentName, referenceNumber),
+	})
+	if err != nil {
+		log.Printf("failed to request client document upload for service_request_id=%s: %v", input.ServiceRequestID, err)
+		return err
+	}
+
+	return nil
+}
+
+func normalizedUploadRequestUrgency(value string) string {
+	switch strings.TrimSpace(strings.ToLower(value)) {
+	case "urgent":
+		return "urgent"
+	case "high":
+		return "high"
+	case "normal":
+		return "normal"
+	default:
+		return "high"
 	}
 }
 

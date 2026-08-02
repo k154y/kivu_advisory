@@ -1,70 +1,65 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowRight,
   CalendarClock,
+  CheckCircle2,
   FileText,
   FolderOpen,
-  LinkIcon,
+  Loader2,
   MessageSquare,
+  Plus,
   RefreshCcw,
-  Search,
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
 import { routes } from "@/lib/routes";
 
-type ServiceRequest = {
+type ClientServiceRequest = {
   id: string;
   reference_number?: string;
   service_id?: string;
   service_name?: string;
-  title: string;
+  title?: string;
   description?: string;
   status?: string;
   priority?: string;
-  source?: string;
+  preferred_contact_method?: string;
   expected_deadline?: string;
   created_at?: string;
-  submitted_at?: string;
   updated_at?: string;
+  submitted_at?: string;
 };
-
-const REQUEST_LIST_PATHS = [
-  "/client/service-requests?page_size=100",
-  "/client/requests?page_size=100",
-];
-
-function getItems<T>(response: unknown): T[] {
-  if (Array.isArray(response)) return response as T[];
-
-  if (!response || typeof response !== "object") return [];
-
-  const objectResponse = response as {
-    items?: T[];
-    data?: T[] | { items?: T[] };
-  };
-
-  if (Array.isArray(objectResponse.items)) return objectResponse.items;
-  if (Array.isArray(objectResponse.data)) return objectResponse.data;
-
-  if (
-    objectResponse.data &&
-    !Array.isArray(objectResponse.data) &&
-    Array.isArray(objectResponse.data.items)
-  ) {
-    return objectResponse.data.items;
-  }
-
-  return [];
-}
 
 function getSafeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+function getItems<T>(data: unknown): T[] {
+  if (Array.isArray(data)) return data as T[];
+
+  if (!data || typeof data !== "object") return [];
+
+  const objectData = data as {
+    items?: T[];
+    data?: T[] | { items?: T[] };
+  };
+
+  if (Array.isArray(objectData.items)) return objectData.items;
+  if (Array.isArray(objectData.data)) return objectData.data;
+
+  if (
+    objectData.data &&
+    !Array.isArray(objectData.data) &&
+    Array.isArray(objectData.data.items)
+  ) {
+    return objectData.data.items;
+  }
+
+  return [];
 }
 
 function formatDate(value?: string) {
@@ -81,10 +76,10 @@ function formatDate(value?: string) {
   }
 }
 
-function statusLabel(status?: string) {
-  if (!status) return "New";
+function labelFromValue(value?: string) {
+  if (!value) return "—";
 
-  return status
+  return value
     .split("_")
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
@@ -114,7 +109,7 @@ function priorityClass(priority?: string) {
     case "high":
       return "border-orange-100 bg-orange-50 text-orange-700";
     case "normal":
-      return "border-teal/20 bg-teal/10 text-teal";
+      return "border-blue-100 bg-blue-50 text-blue-700";
     case "low":
       return "border-gray-100 bg-lightgray text-gray-600";
     default:
@@ -122,274 +117,336 @@ function priorityClass(priority?: string) {
   }
 }
 
-function buildMessageHref(request: ServiceRequest) {
+function buildMessageHref(request: ClientServiceRequest) {
   const params = new URLSearchParams();
 
-  params.set("service_request_id", request.id);
-
-  if (request.reference_number) {
-    params.set("reference", request.reference_number);
-  }
+  if (request.id) params.set("service_request_id", request.id);
+  if (request.reference_number) params.set("reference", request.reference_number);
 
   return `${routes.client.messages}?${params.toString()}`;
 }
 
-function buildDocumentsHref(request: ServiceRequest) {
+function buildDocumentsHref(request: ClientServiceRequest) {
   const params = new URLSearchParams();
 
-  params.set("service_request_id", request.id);
-
-  if (request.reference_number) {
-    params.set("reference", request.reference_number);
-  }
+  if (request.id) params.set("service_request_id", request.id);
+  if (request.reference_number) params.set("reference", request.reference_number);
 
   return `${routes.client.documents}?${params.toString()}`;
 }
 
-export default function ClientRequestsPage() {
-  const [requests, setRequests] = useState<ServiceRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+function buildRequestDetailHref(request: ClientServiceRequest) {
+  return `/client/requests/${request.id}`;
+}
 
-  const loadRequests = useCallback(async () => {
-    setLoading(true);
+export default function ClientRequestsPage() {
+  const [requests, setRequests] = useState<ClientServiceRequest[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadRequests = async (refresh = false) => {
+    if (refresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    setError(null);
 
     try {
-      let loadedRequests: ServiceRequest[] = [];
+      let data: unknown;
 
-      for (const path of REQUEST_LIST_PATHS) {
-        try {
-          const result = await api.get<unknown>(path);
-          loadedRequests = getItems<ServiceRequest>(result.data);
-
-          if (loadedRequests.length > 0 || path === REQUEST_LIST_PATHS[0]) {
-            break;
-          }
-        } catch {
-          continue;
-        }
+      try {
+        const result = await api.get<unknown>(
+          "/client/service-requests?page_size=100",
+        );
+        data = result.data;
+      } catch {
+        const fallbackResult = await api.get<unknown>(
+          "/client/requests?page_size=100",
+        );
+        data = fallbackResult.data;
       }
 
-      setRequests(loadedRequests);
-    } catch (error) {
-      toast.error(
-        getSafeErrorMessage(error, "Failed to load your service requests."),
+      const items = getItems<ClientServiceRequest>(data).sort((a, b) => {
+        const dateA = new Date(a.created_at || a.submitted_at || 0).getTime();
+        const dateB = new Date(b.created_at || b.submitted_at || 0).getTime();
+
+        return dateB - dateA;
+      });
+
+      setRequests(items);
+    } catch (loadError) {
+      const message = getSafeErrorMessage(
+        loadError,
+        "Failed to load your service requests.",
       );
+
+      setRequests([]);
+      setError(message);
+      toast.error(message);
     } finally {
-      setLoading(false);
+      setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, []);
+  };
 
   useEffect(() => {
     void loadRequests();
-  }, [loadRequests]);
+  }, []);
 
-  const filteredRequests = useMemo(() => {
-    const term = search.trim().toLowerCase();
+  const stats = useMemo(() => {
+    const total = requests.length;
 
-    if (!term) return requests;
+    const active = requests.filter((request) =>
+      ["new", "pending", "in_review", "waiting_client", "in_progress"].includes(
+        request.status || "new",
+      ),
+    ).length;
 
-    return requests.filter((request) =>
-      [
-        request.reference_number,
-        request.title,
-        request.description,
-        request.status,
-        request.priority,
-        request.service_name,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
-        .includes(term),
+    const completed = requests.filter(
+      (request) => request.status === "completed",
+    ).length;
+
+    const waiting = requests.filter(
+      (request) => request.status === "waiting_client",
+    ).length;
+
+    return {
+      total,
+      active,
+      completed,
+      waiting,
+    };
+  }, [requests]);
+
+  if (isLoading) {
+    return (
+      <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
+        <div className="flex items-center gap-3 text-navy">
+          <Loader2 className="h-5 w-5 animate-spin" />
+          <div>
+            <h1 className="font-bold">Loading your requests</h1>
+            <p className="text-sm text-gray-500">
+              Please wait while we fetch your service requests.
+            </p>
+          </div>
+        </div>
+      </div>
     );
-  }, [requests, search]);
+  }
 
   return (
-    <div>
-      <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div className="space-y-6">
+      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
+            <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
               Client Portal
             </p>
-
-            <h1 className="text-2xl font-bold text-navy">
-              My Service Requests
-            </h1>
-
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              Track your requests, messages, documents, statuses, and deadlines
-              by request reference number.
+            <h1 className="mt-2 text-2xl font-bold text-navy">My Requests</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              View your service requests, documents, and messages in one place.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => void loadRequests()}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-lightgray"
+              onClick={() => void loadRequests(true)}
+              disabled={isRefreshing}
+              className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-navy transition-colors hover:bg-lightgray disabled:opacity-60"
             >
-              <RefreshCcw size={15} />
+              <RefreshCcw
+                className={isRefreshing ? "h-4 w-4 animate-spin" : "h-4 w-4"}
+              />
               Refresh
             </button>
 
             <Link
-              href={routes.client.linkRequest}
-              className="inline-flex items-center gap-2 rounded-lg border border-teal/20 bg-teal/10 px-4 py-2 text-sm font-semibold text-teal hover:bg-teal hover:text-white"
+              href="/request-service"
+              className="inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal"
             >
-              <LinkIcon size={15} />
-              Link Existing Request
-            </Link>
-
-            <Link
-              href={routes.requestService}
-              className="inline-flex items-center gap-2 rounded-lg bg-navy px-4 py-2 text-sm font-semibold text-white hover:bg-teal"
-            >
+              <Plus className="h-4 w-4" />
               New Request
-              <ArrowRight size={15} />
             </Link>
           </div>
         </div>
       </section>
 
-      <section className="mb-6 rounded-xl border border-gray-100 bg-white p-4">
-        <div className="relative">
-          <Search
-            size={16}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-          />
-
-          <input
-            type="text"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search by reference number, title, status, or priority..."
-            className="w-full rounded-lg border border-gray-200 py-3 pl-10 pr-4 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
-          />
-        </div>
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Total Requests"
+          value={stats.total}
+          icon={<FileText className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Active"
+          value={stats.active}
+          icon={<CalendarClock className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Waiting Client"
+          value={stats.waiting}
+          icon={<MessageSquare className="h-5 w-5" />}
+        />
+        <StatCard
+          label="Completed"
+          value={stats.completed}
+          icon={<CheckCircle2 className="h-5 w-5" />}
+        />
       </section>
 
-      {loading ? (
-        <div className="flex justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-navy border-t-transparent" />
-        </div>
-      ) : filteredRequests.length === 0 ? (
-        <section className="rounded-xl border border-gray-100 bg-white p-12 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-lightgray">
-            <FileText size={28} className="text-gray-300" />
-          </div>
+      {error ? (
+        <section className="rounded-2xl border border-red-100 bg-red-50 p-5 text-sm text-red-700">
+          {error}
+        </section>
+      ) : null}
 
-          <h2 className="font-semibold text-navy">No service requests found</h2>
-
-          <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
-            Your service requests will appear here after they are submitted or
-            linked to your client account.
+      <section className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
+        <div className="border-b border-gray-100 px-6 py-5">
+          <h2 className="text-lg font-bold text-navy">Recent Requests</h2>
+          <p className="text-sm text-gray-500">
+            {requests.length} request{requests.length === 1 ? "" : "s"} found.
           </p>
+        </div>
 
-          <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
-            <Link
-              href={routes.client.linkRequest}
-              className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal/20 bg-teal/10 px-4 py-2.5 text-sm font-semibold text-teal hover:bg-teal hover:text-white"
-            >
-              <LinkIcon size={15} />
-              Link Existing Request
-            </Link>
+        {requests.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-lightgray text-navy">
+              <FileText className="h-6 w-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-navy">No requests yet</h3>
+
+            <p className="mx-auto mt-2 max-w-md text-sm text-gray-500">
+              You do not have any service requests linked to your client account
+              yet.
+            </p>
 
             <Link
-              href={routes.requestService}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal"
+              href="/request-service"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-navy px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-teal"
             >
-              Submit New Request
-              <ArrowRight size={15} />
+              <Plus className="h-4 w-4" />
+              Create Request
             </Link>
           </div>
-        </section>
-      ) : (
-        <section className="space-y-4">
-          {filteredRequests.map((request) => (
-            <article
-              key={request.id}
-              className="rounded-xl border border-gray-100 bg-white p-5"
-            >
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="mb-2 flex flex-wrap items-center gap-2">
-                    <span className="rounded-full border border-navy/10 bg-lightgray px-2.5 py-1 text-xs font-bold text-navy">
-                      {request.reference_number || request.id}
-                    </span>
+        ) : (
+          <div className="divide-y divide-gray-100">
+            {requests.map((request) => (
+              <article
+                key={request.id}
+                className="px-6 py-5 transition-colors hover:bg-lightgray/40"
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="truncate text-base font-bold text-navy">
+                        {request.reference_number ||
+                          `Request ${request.id.slice(0, 8)}`}
+                      </h3>
 
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(
-                        request.status,
-                      )}`}
-                    >
-                      {statusLabel(request.status)}
-                    </span>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${statusClass(
+                          request.status,
+                        )}`}
+                      >
+                        {labelFromValue(request.status || "new")}
+                      </span>
 
-                    <span
-                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold capitalize ${priorityClass(
-                        request.priority,
-                      )}`}
-                    >
-                      {request.priority || "normal"}
-                    </span>
-                  </div>
+                      <span
+                        className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${priorityClass(
+                          request.priority,
+                        )}`}
+                      >
+                        {labelFromValue(request.priority || "normal")}
+                      </span>
+                    </div>
 
-                  <h2 className="text-lg font-bold text-navy">
-                    {request.title || "Untitled request"}
-                  </h2>
-
-                  {request.description ? (
-                    <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-gray-500">
-                      {request.description}
+                    <p className="mt-2 text-sm font-medium text-charcoal">
+                      {request.service_name || request.title || "Service request"}
                     </p>
-                  ) : null}
 
-                  <div className="mt-4 flex flex-wrap gap-4 text-xs text-gray-400">
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClock size={13} />
-                      Created:{" "}
-                      {formatDate(request.created_at || request.submitted_at)}
-                    </span>
+                    {request.description ? (
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-500">
+                        {request.description}
+                      </p>
+                    ) : null}
 
-                    <span className="inline-flex items-center gap-1">
-                      <CalendarClock size={13} />
-                      Deadline: {formatDate(request.expected_deadline)}
-                    </span>
+                    <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-400">
+                      <span>
+                        Created:{" "}
+                        {formatDate(request.created_at || request.submitted_at)}
+                      </span>
+                      <span>
+                        Deadline: {formatDate(request.expected_deadline)}
+                      </span>
+                      <span>
+                        Contact:{" "}
+                        {labelFromValue(request.preferred_contact_method)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={buildMessageHref(request)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-teal/30 px-3 py-2 text-xs font-semibold text-teal transition-colors hover:bg-teal hover:text-white"
+                    >
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Messages
+                    </Link>
+
+                    <Link
+                      href={buildDocumentsHref(request)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-navy transition-colors hover:bg-lightgray"
+                    >
+                      <FolderOpen className="h-3.5 w-3.5" />
+                      Documents
+                    </Link>
+
+                    <Link
+                      href={buildRequestDetailHref(request)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-navy px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-teal"
+                    >
+                      Details
+                    </Link>
                   </div>
                 </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
 
-                <div className="flex shrink-0 flex-wrap gap-2">
-                  <Link
-                    href={buildMessageHref(request)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-teal/20 bg-teal/10 px-3 py-2 text-xs font-semibold text-teal hover:bg-teal hover:text-white"
-                  >
-                    <MessageSquare size={14} />
-                    Messages
-                  </Link>
+function StatCard({
+  label,
+  value,
+  icon,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+            {label}
+          </p>
+          <p className="mt-2 text-2xl font-bold text-navy">{value}</p>
+        </div>
 
-                  <Link
-                    href={buildDocumentsHref(request)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gold/30 bg-gold/10 px-3 py-2 text-xs font-semibold text-navy hover:bg-gold/20"
-                  >
-                    <FolderOpen size={14} />
-                    Documents
-                  </Link>
-
-                  <Link
-                    href={routes.client.requestDetail(request.id)}
-                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-lightgray"
-                  >
-                    Details
-                    <ArrowRight size={14} />
-                  </Link>
-                </div>
-              </div>
-            </article>
-          ))}
-        </section>
-      )}
+        <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-lightgray text-teal">
+          {icon}
+        </div>
+      </div>
     </div>
   );
 }

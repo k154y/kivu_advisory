@@ -1,15 +1,18 @@
 "use client";
 
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType } from "react";
 import {
   BarChart2,
+  Bell,
   BookOpen,
   Calendar,
   Edit3,
   FileText,
   FolderOpen,
+  KeyRound,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -21,17 +24,11 @@ import {
   UserCircle,
   Users,
   X,
-  KeyRound,
-
 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/hooks/use-auth";
-import {
-  adminNavigation,
-  clientNavigation,
-  routes,
-} from "@/lib/routes";
+import { adminNavigation, clientNavigation, routes } from "@/lib/routes";
 import { cn, getSafeInitials } from "@/lib/utils";
 import type { UserRole } from "@/types/api";
 
@@ -56,11 +53,11 @@ type SidebarIcon = ComponentType<{ size?: number; className?: string }>;
 const accountantNavigation: NavigationItem[] = [
   {
     label: "Dashboard",
-    href: "/accountant/dashboard",
+    href: routes.accountant.dashboard,
   },
   {
     label: "Assigned Work",
-    href: "/accountant/assigned-work",
+    href: routes.accountant.assignedWork,
   },
   {
     label: "Consultations",
@@ -68,21 +65,26 @@ const accountantNavigation: NavigationItem[] = [
   },
   {
     label: "My Documents",
-    href: "/accountant/documents",
+    href: routes.accountant.documents,
   },
   {
     label: "Messages",
-    href: "/accountant/messages",
+    href: routes.accountant.messages,
   },
   {
     label: "Tax Credentials",
-    href: "/accountant/tax-credentials",
+    href: routes.accountant.taxCredentials,
+  },
+  {
+    label: "Notifications",
+    href: routes.accountant.notifications,
   },
   {
     label: "My Profile",
-    href: "/accountant/profile",
+    href: routes.accountant.profile,
   },
 ];
+
 const adminIconByHref: Record<string, SidebarIcon> = {
   [routes.admin.dashboard]: LayoutDashboard,
   [routes.admin.requests]: FileText,
@@ -103,8 +105,7 @@ const adminIconByHref: Record<string, SidebarIcon> = {
   [routes.admin.settings]: ShieldCheck,
   [routes.admin.taxCredentialSystems]: KeyRound,
   [routes.admin.taxCredentials]: KeyRound,
-
-
+  [routes.admin.notifications]: Bell,
 };
 
 const clientIconByHref: Record<string, SidebarIcon> = {
@@ -112,17 +113,19 @@ const clientIconByHref: Record<string, SidebarIcon> = {
   [routes.client.requests]: FileText,
   [routes.client.documents]: FolderOpen,
   [routes.client.messages]: MessagesSquare,
+  [routes.client.notifications]: Bell,
   [routes.client.profile]: UserCircle,
 };
 
 const accountantIconByHref: Record<string, SidebarIcon> = {
-  "/accountant/dashboard": LayoutDashboard,
-  "/accountant/assigned-work": FileText,
+  [routes.accountant.dashboard]: LayoutDashboard,
+  [routes.accountant.assignedWork]: FileText,
   "/accountant/consultation": Calendar,
-  "/accountant/documents": FolderOpen,
-  "/accountant/messages": MessagesSquare,
-  "/accountant/profile": UserCircle,
-  "/accountant/tax-credentials": KeyRound,
+  [routes.accountant.documents]: FolderOpen,
+  [routes.accountant.messages]: MessagesSquare,
+  [routes.accountant.taxCredentials]: KeyRound,
+  [routes.accountant.notifications]: Bell,
+  [routes.accountant.profile]: UserCircle,
 };
 
 const getNavigationByRole = (
@@ -147,9 +150,7 @@ const getIconByRoleAndHref = (
 
   if (effectiveRole === "admin") return adminIconByHref[href] || FileText;
   if (effectiveRole === "client") return clientIconByHref[href] || FileText;
-  if (effectiveRole === "accountant") {
-    return accountantIconByHref[href] || FileText;
-  }
+  if (effectiveRole === "accountant") return accountantIconByHref[href] || FileText;
 
   return FileText;
 };
@@ -167,11 +168,7 @@ const getRoleLabel = (
   return "User";
 };
 
-function SidebarContent({
-  className,
-  onClose,
-  variant,
-}: SidebarContentProps) {
+function SidebarContent({ className, onClose, variant }: SidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuth();
@@ -190,7 +187,7 @@ function SidebarContent({
   return (
     <aside
       className={cn(
-        "flex h-full min-h-screen w-60 shrink-0 flex-col overflow-hidden bg-navy text-white",
+        "flex h-full min-h-screen w-60 shrink-0 flex-col bg-navy text-white",
         className,
       )}
     >
@@ -199,7 +196,6 @@ function SidebarContent({
           <span className="text-xl font-bold tracking-tight text-white">
             Kivu Advisory
           </span>
-        
         </Link>
 
         {onClose ? (
@@ -207,16 +203,21 @@ function SidebarContent({
             type="button"
             onClick={onClose}
             className="text-gray-400 hover:text-white lg:hidden"
+            aria-label="Close sidebar"
           >
             <X size={20} />
           </button>
         ) : null}
       </div>
 
-      <div className="border-b border-white/10 px-5 py-3">
-        <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-          {getRoleLabel(user?.role, variant)}
-        </p>
+      <div className="relative border-b border-white/10 px-5 py-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
+            {getRoleLabel(user?.role, variant)}
+          </p>
+
+          <NotificationBell />
+        </div>
       </div>
 
       <nav className="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">
@@ -300,6 +301,7 @@ export function DashboardSidebar({
         type="button"
         onClick={() => setMobileOpen(true)}
         className="fixed left-4 top-4 z-50 flex h-10 w-10 items-center justify-center rounded-lg bg-navy text-white shadow-md lg:hidden"
+        aria-label="Open sidebar"
       >
         <Menu size={18} />
       </button>
