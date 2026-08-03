@@ -36,6 +36,13 @@ type UpdateDocumentRequest struct {
 	Description  string `json:"description"`
 }
 
+type RequestClientUploadRequest struct {
+	ServiceRequestID string `json:"service_request_id"`
+	DocumentName     string `json:"document_name"`
+	Message          string `json:"message"`
+	Urgency          string `json:"urgency"`
+}
+
 func NewHandler(service *Service, clients ClientProfileService) *Handler {
 	return &Handler{
 		service: service,
@@ -95,6 +102,41 @@ func (h *Handler) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	response.Created(w, "document uploaded successfully", uploadedDocument)
+}
+
+func (h *Handler) RequestClientUpload(w http.ResponseWriter, r *http.Request) {
+	if h == nil || h.service == nil {
+		response.InternalServerError(w)
+		return
+	}
+
+	actor, err := h.actorFromRequest(r)
+	if err != nil {
+		writeDocumentHandlerError(w, err)
+		return
+	}
+
+	var request RequestClientUploadRequest
+	if err := readDocumentJSON(w, r, &request); err != nil {
+		writeDocumentHandlerError(w, err)
+		return
+	}
+
+	err = h.service.RequestClientUpload(r.Context(), actor, RequestClientUploadInput{
+		ServiceRequestID: request.ServiceRequestID,
+		DocumentName:     request.DocumentName,
+		Message:          request.Message,
+		Urgency:          request.Urgency,
+	})
+	if err != nil {
+		writeDocumentHandlerError(w, err)
+		return
+	}
+
+	response.OK(w, "client document upload requested successfully", map[string]any{
+		"service_request_id": request.ServiceRequestID,
+		"document_name":      request.DocumentName,
+	})
 }
 
 func (h *Handler) ListDocuments(w http.ResponseWriter, r *http.Request) {

@@ -3,14 +3,17 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  Bell,
   FileText,
   FolderOpen,
   Home,
+  KeyRound,
   LogOut,
   MessageSquareText,
   UserCircle,
 } from "lucide-react";
 
+import { NotificationBell } from "@/components/notifications/NotificationBell";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { clientNavigation, routes } from "@/lib/routes";
@@ -21,42 +24,27 @@ type DashboardTopbarProps = {
   variant?: "default" | "client";
 };
 
-const getTitleFromPathname = (pathname: string) => {
-  const parts = pathname.split("/").filter(Boolean);
-
-  if (parts.length <= 1) {
-    return "Dashboard";
-  }
-
-  const lastPart = parts[parts.length - 1];
-
-  if (lastPart === "dashboard") return "Dashboard";
-  if (lastPart === "assigned-work") return "Assigned Work";
-  if (lastPart === "service-requests") return "Service Requests";
-
-  if (lastPart === "create") {
-    const previousPart = parts[parts.length - 2] || "Create";
-    return `Create ${previousPart
-      .replace(/-/g, " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase())}`;
-  }
-
-  if (lastPart.startsWith("[") && lastPart.endsWith("]")) {
-    return "Details";
-  }
-
-  return lastPart
-    .replace(/-/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-};
-
 const clientIcons = {
   [routes.client.dashboard]: Home,
   [routes.client.requests]: FileText,
   [routes.client.documents]: FolderOpen,
   [routes.client.messages]: MessageSquareText,
+  [routes.client.notifications]: Bell,
   [routes.client.profile]: UserCircle,
+  "/client/tax-credentials": KeyRound,
 } as const;
+
+function getTitleFromPathname(pathname: string) {
+  const parts = pathname.split("/").filter(Boolean);
+  const lastPart = parts[parts.length - 1] || "Dashboard";
+
+  if (lastPart === "dashboard") return "Dashboard";
+  if (lastPart === "service-requests") return "Service Requests";
+
+  return lastPart
+    .replace(/-/g, " ")
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export function DashboardTopbar({
   className,
@@ -75,15 +63,19 @@ export function DashboardTopbar({
           className,
         )}
       >
-        <div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          <Link href={routes.home} className="flex items-center gap-1">
-            <span className="text-lg font-bold tracking-tight">Kivu Advisory</span>
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
+          <Link href={routes.home} className="flex shrink-0 items-center gap-1">
+            <span className="text-lg font-bold tracking-tight">
+              Kivu Advisory
+            </span>
             <span className="mb-2.5 h-1.5 w-1.5 rounded-full bg-[#C99A35]" />
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex">
+          <nav className="hidden min-w-0 flex-1 items-center justify-center gap-1 md:flex">
             {clientNavigation.map((item) => {
-              const Icon = clientIcons[item.href as keyof typeof clientIcons] || Home;
+              const Icon =
+                clientIcons[item.href as keyof typeof clientIcons] || Home;
+
               const isActive =
                 pathname === item.href || pathname.startsWith(`${item.href}/`);
 
@@ -105,12 +97,14 @@ export function DashboardTopbar({
             })}
           </nav>
 
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
+            <NotificationBell />
+
             <div className="hidden text-right sm:block">
-              <p className="max-w-[220px] truncate text-sm font-medium text-white">
+              <p className="max-w-[180px] truncate text-sm font-medium text-white">
                 {user?.full_name || "Client"}
               </p>
-              <p className="max-w-[220px] truncate text-xs text-slate-300">
+              <p className="max-w-[180px] truncate text-xs text-slate-300">
                 {user?.email}
               </p>
             </div>
@@ -149,6 +143,8 @@ export function DashboardTopbar({
         </div>
 
         <div className="flex items-center gap-3">
+          <NotificationBell />
+
           <div className="hidden text-right sm:block">
             <p className="max-w-[220px] truncate text-sm font-medium text-slate-950">
               {user?.full_name || "User"}

@@ -68,6 +68,18 @@ func RegisterRoutes(
 	)
 
 	mux.Handle(
+		api+"/admin/documents/request-upload",
+		methodOnlyHandler(
+			http.MethodPost,
+			middleware.RequireAuth(tokenVerifier)(
+				middleware.RequireRole(middleware.RoleAdmin)(
+					http.HandlerFunc(handler.RequestClientUpload),
+				),
+			),
+		),
+	)
+
+	mux.Handle(
 		api+"/documents/download",
 		methodOnlyHandler(
 			http.MethodGet,

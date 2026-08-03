@@ -1,11 +1,12 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 
 import { DashboardSidebar } from "@/components/layout/dashboard-sidebar";
-import { DashboardTopbar } from "@/components/layout/dashboard-topbar";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useAuth } from "@/hooks/use-auth";
+import { routes } from "@/lib/routes";
 import { AuthProvider } from "@/providers/auth-provider";
 
 type DashboardLayoutProps = {
@@ -17,7 +18,19 @@ function DashboardShell({
   children,
   variant = "admin",
 }: DashboardLayoutProps) {
+  const router = useRouter();
   const { isLoading, user } = useAuth();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.replace(routes.login);
+      return;
+    }
+
+    if (!isLoading && user && user.role !== variant) {
+      router.replace(routes.login);
+    }
+  }, [isLoading, router, user, variant]);
 
   if (isLoading) {
     return (
@@ -41,14 +54,13 @@ function DashboardShell({
     );
   }
 
-  if (variant === "client") {
+  if (user.role !== variant) {
     return (
-      <div className="min-h-screen bg-lightgray">
-        <DashboardTopbar variant="client" />
-
-        <main className="px-4 py-8 sm:px-6">
-          <div className="mx-auto w-full max-w-5xl">{children}</div>
-        </main>
+      <div className="min-h-screen bg-lightgray p-6">
+        <LoadingState
+          title="Redirecting"
+          description="You do not have access to this dashboard."
+        />
       </div>
     );
   }
@@ -59,12 +71,12 @@ function DashboardShell({
         <DashboardSidebar variant={variant} />
 
         <div className="min-w-0 flex-1 lg:pl-60">
-          <main className="px-4 py-16 sm:px-6 sm:py-8 lg:px-8">
+          <main className="px-4 py-8 sm:px-6 lg:px-8">
             <div
               className={
-                variant === "accountant"
-                  ? "mx-auto w-full max-w-5xl"
-                  : "mx-auto w-full max-w-7xl"
+                variant === "admin"
+                  ? "mx-auto w-full max-w-7xl"
+                  : "mx-auto w-full max-w-5xl"
               }
             >
               {children}
