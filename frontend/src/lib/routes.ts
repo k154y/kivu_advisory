@@ -33,6 +33,7 @@ export const routes = {
     messages: "/admin/messages",
     profile: "/admin/profile",
     auditLog: "/admin/audit-log",
+    notifications: "/admin/notifications",
 
     taxCredentialSystems: "/admin/tax-credential-systems",
     taxCredentials: "/admin/tax-credentials",
@@ -70,6 +71,7 @@ export const routes = {
     requestDetail: (id: string) => `/client/requests/${id}`,
     documents: "/client/documents",
     messages: "/client/messages",
+    notifications: "/client/notifications",
     linkRequest: "/client/requests/link",
   },
 accountant: {
@@ -79,6 +81,7 @@ accountant: {
   documents: "/accountant/documents",
   messages: "/accountant/messages",
   taxCredentials: "/accountant/tax-credentials",
+  notifications: "/accountant/notifications",
   profile: "/accountant/profile",
 },
 } as const;
@@ -118,7 +121,8 @@ export const adminNavigation = [
   { label: "Testimonials", href: routes.admin.testimonials },
   { label: "Social Links", href: routes.admin.socialLinks },
   { label: "Statistics", href: routes.admin.statistics },
-  { label: "Settings", href: routes.admin.settings },
+  { label: "Notifications", href: routes.admin.notifications },
+  // { label: "Settings", href: routes.admin.settings },
 ];
 
 export const adminContentNavigation = [
@@ -134,6 +138,8 @@ export const clientNavigation = [
   { label: "My Requests", href: routes.client.requests },
   { label: "Documents", href: routes.client.documents },
   { label: "Messages", href: routes.client.messages },
+  { label: "Notifications", href: routes.client.notifications },
+  { label: "Tax Credentials", href: "/client/tax-credentials" },
   { label: "Profile", href: routes.client.profile },
 ];
 
@@ -143,6 +149,7 @@ export const accountantNavigation = [
   { label: "Documents", href: routes.accountant.documents },
   { label: "Messages", href: routes.accountant.messages },
   { label: "Tax Credentials", href: routes.accountant.taxCredentials },
+  { label: "Notifications", href: routes.accountant.notifications },
   { label: "My Profile", href: routes.accountant.profile },
 ];
 

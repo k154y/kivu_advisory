@@ -26,6 +26,69 @@ type NotifyUserInput struct {
 	SMSBody      string
 }
 
+type NotifyExternalContactInput struct {
+	UserEmail string
+	UserPhone string
+
+	Channels []string
+
+	EmailSubject string
+	EmailBody    string
+	SMSBody      string
+}
+
+func (s *Service) NotifyExternalContact(ctx context.Context, input NotifyExternalContactInput) error {
+	if s == nil {
+		return apperrors.Internal("notification service is not initialized")
+	}
+
+	input.UserEmail = strings.TrimSpace(input.UserEmail)
+	input.UserPhone = strings.TrimSpace(input.UserPhone)
+	input.EmailSubject = strings.TrimSpace(input.EmailSubject)
+	input.EmailBody = strings.TrimSpace(input.EmailBody)
+	input.SMSBody = strings.TrimSpace(input.SMSBody)
+
+	if input.UserEmail == "" && input.UserPhone == "" {
+		return apperrors.InvalidInput("external email or phone is required")
+	}
+
+	if len(input.Channels) == 0 {
+		input.Channels = []string{ChannelEmail}
+	}
+
+	for _, channel := range input.Channels {
+		channel = strings.TrimSpace(strings.ToLower(channel))
+
+		switch channel {
+		case ChannelEmail:
+			if input.UserEmail == "" || s.emailSender == nil {
+				continue
+			}
+
+			if _, err := s.emailSender.SendEmail(ctx, EmailMessage{
+				To:      input.UserEmail,
+				Subject: input.EmailSubject,
+				Body:    input.EmailBody,
+			}); err != nil {
+				return err
+			}
+
+		case ChannelSMS:
+			if input.UserPhone == "" || s.smsSender == nil {
+				continue
+			}
+
+			if _, err := s.smsSender.SendSMS(ctx, SMSMessage{
+				To:   input.UserPhone,
+				Body: input.SMSBody,
+			}); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
 func (s *Service) NotifyUser(ctx context.Context, input NotifyUserInput) (*PublicNotification, error) {
 	if s == nil || s.repo == nil {
 		return nil, apperrors.Internal("notification service is not initialized")

@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import {
   ArrowLeft,
-  BriefcaseBusiness,
   CheckCircle,
   Clock,
   FileText,
@@ -21,7 +20,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Button } from "@/components/ui/button";
+import { AdminRequestClientDocumentUploadCard } from "@/components/documents/AdminRequestClientDocumentUploadCard";
 import { EmptyState } from "@/components/ui/empty-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { api } from "@/lib/api";
@@ -347,6 +346,11 @@ export default function AdminRequestDetailPage() {
           <ClientInformationCard request={request} />
 
           <RequestDetailsCard request={request} />
+
+          <AdminRequestClientDocumentUploadCard
+            serviceRequestId={request.id}
+            referenceNumber={request.reference_number}
+          />
         </div>
 
         <div className="space-y-5">
@@ -357,7 +361,7 @@ export default function AdminRequestDetailPage() {
           />
 
           <AssignAccountantCard
-            serviceRequestId={requestId}
+            serviceRequestId={request.id}
             onAssigned={() => void loadRequest()}
           />
 
@@ -423,7 +427,7 @@ function ClientInformationCard({ request }: { request: AdminRequestDetail }) {
                 <p className="text-xs text-gray-400">{field.label}</p>
                 <p
                   className="truncate text-sm font-medium text-charcoal"
-                  title={field.value}
+                  title={String(field.value)}
                 >
                   {field.value}
                 </p>

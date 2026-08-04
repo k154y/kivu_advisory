@@ -8,7 +8,9 @@ import (
 )
 
 type Service struct {
-	repo Repository
+	repo                        Repository
+	notificationService         NotificationService
+	accountantRecipientResolver AccountantRecipientResolver
 }
 
 func NewService(repo Repository) *Service {
@@ -32,6 +34,8 @@ func (s *Service) CreateAdmin(ctx context.Context, input CreateAssignmentInput) 
 	if err != nil {
 		return nil, err
 	}
+
+	s.notifyAccountantAboutAssignment(ctx, createdAssignment)
 
 	publicAssignment := createdAssignment.Public()
 

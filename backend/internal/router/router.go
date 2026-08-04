@@ -85,11 +85,13 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	serviceRequestService := servicerequest.NewService(serviceRequestRepository)
 
 	assignmentRepository := assignment.NewPostgresRepository(options.DatabasePool)
+	assignmentRecipientRepository := assignment.NewPostgresAccountantRecipientRepository(options.DatabasePool)
 	assignmentService := assignment.NewService(assignmentRepository)
 
 	documentRepository := document.NewPostgresRepository(options.DatabasePool)
 	documentStorage := newDocumentStorage(options.Config)
 	documentAccessChecker := document.NewAccessChecker(serviceRequestRepository, assignmentRepository)
+	documentNotificationResolver := document.NewPostgresNotificationResolver(options.DatabasePool, options.Config.Admin.Email)
 	documentService := document.NewService(documentRepository, documentStorage, documentAccessChecker)
 
 	consultationRepository := consultation.NewPostgresRepository(options.DatabasePool)
@@ -161,6 +163,22 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	}); err != nil {
 		log.Printf("admin bootstrap failed: %v", err)
 	}
+
+	serviceRequestService.SetNotificationService(notificationService)
+	serviceRequestService.SetAdminNotificationRecipient(
+		adminServiceRequestNotificationRecipient(bootstrapCtx, options.DatabasePool, options.Config),
+	)
+
+	consultationService.SetNotificationService(notificationService)
+	consultationService.SetAdminNotificationRecipient(
+		adminConsultationNotificationRecipient(bootstrapCtx, options.DatabasePool, options.Config),
+	)
+
+	assignmentService.SetNotificationService(notificationService)
+	assignmentService.SetAccountantRecipientResolver(assignmentRecipientRepository)
+
+	documentService.SetNotificationService(notificationService)
+	documentService.SetNotificationResolver(documentNotificationResolver)
 
 	authService := auth.NewService(userService, tokenManager, options.Config.Password.MinLength)
 	authService.SetClientService(clientService)
@@ -548,4 +566,70 @@ func SecurityHeaders(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func adminServiceRequestNotificationRecipient(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg *config.Config,
+) servicerequest.AdminNotificationRecipient {
+	if pool == nil || cfg == nil || cfg.Admin.Email == "" {
+		return servicerequest.AdminNotificationRecipient{}
+	}
+
+	var recipient servicerequest.AdminNotificationRecipient
+
+	err := pool.QueryRow(ctx, `
+		SELECT
+			id,
+			email,
+			COALESCE(phone, '')
+		FROM users
+		WHERE LOWER(email) = LOWER($1)
+			AND role = 'admin'
+		LIMIT 1
+	`, cfg.Admin.Email).Scan(
+		&recipient.UserID,
+		&recipient.Email,
+		&recipient.Phone,
+	)
+	if err != nil {
+		log.Printf("admin notification recipient not found for %s: %v", cfg.Admin.Email, err)
+		return servicerequest.AdminNotificationRecipient{}
+	}
+
+	return recipient
+}
+
+func adminConsultationNotificationRecipient(
+	ctx context.Context,
+	pool *pgxpool.Pool,
+	cfg *config.Config,
+) consultation.AdminNotificationRecipient {
+	if pool == nil || cfg == nil || cfg.Admin.Email == "" {
+		return consultation.AdminNotificationRecipient{}
+	}
+
+	var recipient consultation.AdminNotificationRecipient
+
+	err := pool.QueryRow(ctx, `
+		SELECT
+			id,
+			email,
+			COALESCE(phone, '')
+		FROM users
+		WHERE LOWER(email) = LOWER($1)
+			AND role = 'admin'
+		LIMIT 1
+	`, cfg.Admin.Email).Scan(
+		&recipient.UserID,
+		&recipient.Email,
+		&recipient.Phone,
+	)
+	if err != nil {
+		log.Printf("admin consultation notification recipient not found for %s: %v", cfg.Admin.Email, err)
+		return consultation.AdminNotificationRecipient{}
+	}
+
+	return recipient
 }

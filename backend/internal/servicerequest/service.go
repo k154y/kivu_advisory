@@ -8,7 +8,9 @@ import (
 )
 
 type Service struct {
-	repo Repository
+	repo                       Repository
+	notificationService        NotificationService
+	adminNotificationRecipient AdminNotificationRecipient
 }
 
 func NewService(repo Repository) *Service {
@@ -79,6 +81,8 @@ func (s *Service) CreateVisitorRequest(ctx context.Context, input CreateServiceR
 		return nil, err
 	}
 
+	s.notifyAdminAboutNewRequest(ctx, createdRequest)
+
 	publicRequest := publicRequestForClient(createdRequest)
 
 	return &publicRequest, nil
@@ -106,6 +110,8 @@ func (s *Service) CreateClientRequest(ctx context.Context, clientID string, inpu
 	if err != nil {
 		return nil, err
 	}
+
+	s.notifyAdminAboutNewRequest(ctx, createdRequest)
 
 	publicRequest := publicRequestForClient(createdRequest)
 
@@ -313,8 +319,6 @@ func (s *Service) ClaimVisitorRequestsByEmail(ctx context.Context, clientID stri
 
 	return s.repo.ClaimVisitorRequestsByEmail(ctx, clientID, email)
 }
-
-
 
 func publicRequestsForClient(requests []ServiceRequest) []PublicServiceRequest {
 	result := make([]PublicServiceRequest, 0, len(requests))

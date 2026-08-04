@@ -56,6 +56,34 @@ type RequestFormState = {
   contact_method: string;
 };
 
+type StoredAuthUser = {
+  role?: string;
+};
+
+function getStoredAuthUser(): StoredAuthUser | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const rawUser = window.localStorage.getItem("kivu_advisory_user");
+
+    if (!rawUser) return null;
+
+    return JSON.parse(rawUser) as StoredAuthUser;
+  } catch {
+    return null;
+  }
+}
+
+function getStoredAccessToken() {
+  if (typeof window === "undefined") return "";
+
+  return (
+    window.localStorage.getItem("kivu_advisory_access_token") ||
+    window.localStorage.getItem("access_token") ||
+    ""
+  );
+}
+
 function buildRequestDescription(form: RequestFormState) {
   const selectedService =
     SERVICES.find((service) => service.value === form.service_type)?.label ||
@@ -180,15 +208,14 @@ function RequestForm() {
 
     try {
       const selectedService =
-        SERVICES.find((service) => service.value === form.service_type)?.label ||
-        "Service request";
+        SERVICES.find((service) => service.value === form.service_type)
+          ?.label || "Service request";
 
       const requesterName = form.full_name.trim();
       const requesterEmail = form.email.trim();
-      const requesterPhone = (form.phone.trim() || form.whatsapp.trim()).replace(
-        /\s+/g,
-        "",
-      );
+      const requesterPhone = (
+        form.phone.trim() || form.whatsapp.trim()
+      ).replace(/\s+/g, "");
       const requesterCompany = form.company_name.trim();
 
       const payload: Record<string, string> = {
@@ -220,11 +247,30 @@ function RequestForm() {
         payload.requester_company = requesterCompany;
       }
 
-      const response = await fetch(`${apiBaseUrl}/service-requests`, {
+      const storedUser = getStoredAuthUser();
+      const token = getStoredAccessToken();
+
+      const isStoredClient = storedUser?.role === "client";
+
+      if (isStoredClient && !token) {
+        throw new Error("Your client session expired. Please log in again.");
+      }
+
+      const submitPath = isStoredClient
+        ? "/client/service-requests"
+        : "/service-requests";
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (isStoredClient) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${apiBaseUrl}${submitPath}`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
@@ -252,7 +298,12 @@ function RequestForm() {
 
       setReferenceNumber(reference);
       setSubmitted(true);
-      toast.success("Request submitted successfully!");
+
+      toast.success(
+        isStoredClient
+          ? "Request submitted under your client account."
+          : "Request submitted successfully!",
+      );
     } catch (error) {
       toast.error(
         error instanceof Error

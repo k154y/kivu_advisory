@@ -27,6 +27,17 @@ export const endpoints = {
     createAccountant: "/admin/accountants",
   },
 
+    notifications: {
+    list: () => "/notifications",
+    unreadCount: () => "/notifications/unread-count",
+    read: (id: string) => withQuery("/notifications/read", { id }),
+    readAll: () => "/notifications/read-all",
+  },
+
+  adminDocumentRequests: {
+    requestClientUpload: () => "/admin/documents/request-upload",
+  },
+
   client: {
     profile: "/client/profile",
 
@@ -238,18 +249,18 @@ public: {
     markRead: (id: string) => withQuery("/messages/read", { id }),
   },
 
-  notifications: {
-    list: (params?: {
-      notification_type?: string;
-      is_read?: boolean;
-      page?: number;
-      page_size?: number;
-    }) => withQuery("/notifications", params),
-    unreadCount: "/notifications/unread-count",
-    markRead: (id: string) => withQuery("/notifications/read", { id }),
-    markAllRead: "/notifications/read-all",
-    detail: (id: string) => withQuery("/notifications/detail", { id }),
-  },
+  // notifications: {
+  //   list: (params?: {
+  //     notification_type?: string;
+  //     is_read?: boolean;
+  //     page?: number;
+  //     page_size?: number;
+  //   }) => withQuery("/notifications", params),
+  //   unreadCount: "/notifications/unread-count",
+  //   markRead: (id: string) => withQuery("/notifications/read", { id }),
+  //   markAllRead: "/notifications/read-all",
+  //   detail: (id: string) => withQuery("/notifications/detail", { id }),
+  // },
 
   /*
    * These features are required by the project but not confirmed
