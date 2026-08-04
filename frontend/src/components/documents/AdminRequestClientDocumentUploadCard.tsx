@@ -1,13 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import {
-  AlertTriangle,
-  FileQuestion,
-  Loader2,
-  Send,
-  X,
-} from "lucide-react";
+import { useState, type FormEvent } from "react";
+import { FileQuestion, Loader2, Send, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
@@ -20,29 +14,21 @@ type AdminRequestClientDocumentUploadCardProps = {
 
 type Urgency = "normal" | "high" | "urgent";
 
-const DEFAULT_MESSAGE =
-  "Please upload this document so we can continue reviewing your request.";
+type FormState = {
+  document_name: string;
+  message: string;
+  urgency: Urgency;
+};
+
+const urgencyOptions: { value: Urgency; label: string }[] = [
+  { value: "normal", label: "Normal" },
+  { value: "high", label: "High" },
+  { value: "urgent", label: "Urgent" },
+];
 
 function getSafeErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   return fallback;
-}
-
-function getFriendlyErrorMessage(error: unknown) {
-  const message = getSafeErrorMessage(
-    error,
-    "Failed to send client document upload request.",
-  );
-
-  if (
-    message
-      .toLowerCase()
-      .includes("this service request is not linked to a client account with an email")
-  ) {
-    return "This request is not linked to a client account yet. The client must register/login and claim the request before you can request documents.";
-  }
-
-  return message;
 }
 
 export function AdminRequestClientDocumentUploadCard({
@@ -50,151 +36,165 @@ export function AdminRequestClientDocumentUploadCard({
   referenceNumber,
 }: AdminRequestClientDocumentUploadCardProps) {
   const [open, setOpen] = useState(false);
-  const [documentName, setDocumentName] = useState("");
-  const [message, setMessage] = useState(DEFAULT_MESSAGE);
-  const [urgency, setUrgency] = useState<Urgency>("normal");
-  const [submitting, setSubmitting] = useState(false);
+  const [sending, setSending] = useState(false);
 
-  const resetForm = () => {
-    setDocumentName("");
-    setMessage(DEFAULT_MESSAGE);
-    setUrgency("normal");
+  const [form, setForm] = useState<FormState>({
+    document_name: "",
+    message:
+      "Please upload this document so we can continue reviewing your request.",
+    urgency: "high",
+  });
+
+  const updateForm = <K extends keyof FormState>(
+    field: K,
+    value: FormState[K],
+  ) => {
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
   };
 
-  const handleSubmit = async () => {
-    const cleanDocumentName = documentName.trim();
-    const cleanMessage = message.trim();
+  const resetForm = () => {
+    setForm({
+      document_name: "",
+      message:
+        "Please upload this document so we can continue reviewing your request.",
+      urgency: "high",
+    });
+  };
 
-    if (!cleanDocumentName) {
-      toast.error("Document name is required.");
-      return;
-    }
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const documentName = form.document_name.trim();
+    const message = form.message.trim();
 
     if (!serviceRequestId) {
       toast.error("Service request ID is missing.");
       return;
     }
 
-    setSubmitting(true);
+    if (!documentName) {
+      toast.error("Please enter the document name.");
+      return;
+    }
+
+    if (!message) {
+      toast.error("Please enter the message to send.");
+      return;
+    }
+
+    setSending(true);
 
     try {
       await api.post(endpoints.adminDocumentRequests.requestClientUpload(), {
         service_request_id: serviceRequestId,
-        document_name: cleanDocumentName,
-        message: cleanMessage || DEFAULT_MESSAGE,
-        urgency,
+        document_name: documentName,
+        message,
+        urgency: form.urgency,
       });
 
-      toast.success("Client document upload request sent successfully.");
-      setOpen(false);
+      toast.success("Document request sent successfully.");
+
       resetForm();
+      setOpen(false);
     } catch (error) {
-      toast.error(getFriendlyErrorMessage(error));
+      toast.error(
+        getSafeErrorMessage(error, "Failed to send document request."),
+      );
     } finally {
-      setSubmitting(false);
+      setSending(false);
     }
   };
 
   return (
-    <>
-      <section className="rounded-xl border border-gold/30 bg-gold/10 p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="flex gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white text-navy">
-              <FileQuestion size={20} />
-            </div>
-
-            <div>
-              <h3 className="font-bold text-navy">
-                Request client document
-              </h3>
-
-              <p className="mt-1 max-w-2xl text-sm leading-relaxed text-gray-600">
-                Ask the client to upload a missing document for{" "}
-                <span className="font-semibold">
-                  {referenceNumber || "this request"}
-                </span>
-                . This does not upload a file. It sends an in-app notification,
-                email, and SMS according to backend rules.
-              </p>
-            </div>
+    <section className="rounded-2xl border border-gold/30 bg-gold/10 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-4">
+          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-navy shadow-sm">
+            <FileQuestion className="h-5 w-5" />
           </div>
 
-          <button
-            type="button"
-            onClick={() => setOpen(true)}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal"
-          >
-            <Send size={15} />
-            Request document
-          </button>
+          <div>
+            <h3 className="text-lg font-bold text-navy">
+              Request client document
+            </h3>
+
+            <p className="mt-1 text-sm leading-relaxed text-gray-600">
+              Ask the client or requester to upload a missing document
+              {referenceNumber ? ` for ${referenceNumber}` : ""}.
+            </p>
+
+            <p className="mt-2 text-xs leading-relaxed text-gray-500">
+              If the request is linked to a client account, the backend will
+              send in-app notification plus email/SMS. If it is not linked, the
+              backend will send email/SMS to the requester contact details.
+            </p>
+          </div>
         </div>
-      </section>
+
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal"
+        >
+          <Send className="h-4 w-4" />
+          Request document
+        </button>
+      </div>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-8">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-xl">
-            <div className="flex items-start justify-between border-b border-gray-100 px-5 py-4">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 px-4 py-6">
+          <div className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
               <div>
-                <h2 className="font-bold text-navy">
+                <h3 className="text-lg font-bold text-navy">
                   Request client document
-                </h2>
+                </h3>
 
-                <p className="mt-1 text-sm text-gray-500">
-                  The client will receive a notification and upload the document
-                  later.
+                <p className="text-sm text-gray-500">
+                  {referenceNumber || "Service request"}
                 </p>
               </div>
 
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-gray-400 hover:bg-lightgray hover:text-navy"
+                className="flex h-9 w-9 items-center justify-center rounded-xl border border-gray-100 text-gray-400 hover:bg-lightgray hover:text-navy"
                 aria-label="Close"
               >
-                <X size={18} />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="space-y-4 px-5 py-5">
-              <div className="rounded-xl border border-amber-100 bg-amber-50 p-3">
-                <div className="flex gap-2">
-                  <AlertTriangle
-                    size={16}
-                    className="mt-0.5 shrink-0 text-amber-600"
-                  />
-
-                  <p className="text-xs leading-relaxed text-amber-700">
-                    This form only asks the client to upload a document. It does
-                    not upload or attach a file from the admin side.
-                  </p>
-                </div>
-              </div>
-
+            <form onSubmit={handleSubmit} className="space-y-4 p-5">
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-navy">
-                  Required document name
+                  Document name *
                 </label>
 
                 <input
                   type="text"
-                  value={documentName}
-                  onChange={(event) => setDocumentName(event.target.value)}
+                  value={form.document_name}
+                  onChange={(event) =>
+                    updateForm("document_name", event.target.value)
+                  }
                   placeholder="Tax registration certificate"
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-teal/30"
                 />
               </div>
 
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-navy">
-                  Message
+                  Message *
                 </label>
 
                 <textarea
-                  value={message}
-                  onChange={(event) => setMessage(event.target.value)}
                   rows={4}
-                  className="w-full resize-none rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
+                  value={form.message}
+                  onChange={(event) => updateForm("message", event.target.value)}
+                  className="w-full resize-y rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-teal/30"
                 />
               </div>
 
@@ -204,44 +204,60 @@ export function AdminRequestClientDocumentUploadCard({
                 </label>
 
                 <select
-                  value={urgency}
-                  onChange={(event) => setUrgency(event.target.value as Urgency)}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm capitalize focus:border-teal focus:outline-none focus:ring-2 focus:ring-teal/30"
+                  value={form.urgency}
+                  onChange={(event) =>
+                    updateForm("urgency", event.target.value as Urgency)
+                  }
+                  className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-teal/30"
                 >
-                  <option value="normal">normal</option>
-                  <option value="high">high</option>
-                  <option value="urgent">urgent</option>
+                  {urgencyOptions.map((urgency) => (
+                    <option key={urgency.value} value={urgency.value}>
+                      {urgency.label}
+                    </option>
+                  ))}
                 </select>
               </div>
-            </div>
 
-            <div className="flex flex-col-reverse gap-2 border-t border-gray-100 px-5 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                disabled={submitting}
-                className="rounded-lg border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-lightgray disabled:opacity-50"
-              >
-                Cancel
-              </button>
+              <div className="rounded-xl bg-lightgray px-4 py-3 text-xs leading-relaxed text-gray-500">
+                This sends the request to the backend endpoint{" "}
+                <span className="font-semibold text-navy">
+                  /admin/documents/request-upload
+                </span>
+                . Client account is not required.
+              </div>
 
-              <button
-                type="button"
-                onClick={() => void handleSubmit()}
-                disabled={submitting || !documentName.trim()}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-navy px-4 py-2.5 text-sm font-semibold text-white hover:bg-teal disabled:opacity-50"
-              >
-                {submitting ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <Send size={15} />
-                )}
-                Send request
-              </button>
-            </div>
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  disabled={sending}
+                  className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-600 hover:bg-lightgray disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={sending}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-navy px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-teal disabled:opacity-60"
+                >
+                  {sending ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="h-4 w-4" />
+                      Send request
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}
-    </>
+    </section>
   );
 }

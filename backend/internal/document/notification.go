@@ -13,6 +13,7 @@ import (
 
 type NotificationService interface {
 	NotifyUser(ctx context.Context, input notificationpkg.NotifyUserInput) (*notificationpkg.PublicNotification, error)
+	NotifyExternalContact(ctx context.Context, input notificationpkg.NotifyExternalContactInput) error
 }
 
 type NotificationRecipient struct {
@@ -239,10 +240,7 @@ func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input Re
 		return apperrors.Forbidden("only admin can request client document uploads")
 	}
 
-	input.ServiceRequestID = strings.TrimSpace(input.ServiceRequestID)
-	input.DocumentName = strings.TrimSpace(input.DocumentName)
-	input.Message = strings.TrimSpace(input.Message)
-	input.Urgency = strings.TrimSpace(strings.ToLower(input.Urgency))
+	input = normalizeRequestClientUploadInput(input)
 
 	if input.ServiceRequestID == "" {
 		return apperrors.InvalidInput("service request id is required")
@@ -250,10 +248,6 @@ func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input Re
 
 	if input.DocumentName == "" {
 		return apperrors.InvalidInput("document name is required")
-	}
-
-	if input.Message == "" {
-		input.Message = "Please upload the requested document so our team can continue processing your service request."
 	}
 
 	requestContext, err := s.notificationResolver.FindServiceRequestNotificationContext(ctx, input.ServiceRequestID)
@@ -268,12 +262,11 @@ func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input Re
 		Phone:    requestContext.ClientPhone,
 	})
 
-	if recipient.UserID == "" || recipient.Email == "" {
-		return apperrors.InvalidInput("this service request is not linked to a client account with an email")
+	if recipient.Email == "" && recipient.Phone == "" {
+		return apperrors.InvalidInput("this service request does not have a requester email or phone number")
 	}
 
 	referenceNumber := normalizedReferenceNumber(requestContext)
-
 	clientName := recipient.FullName
 	if clientName == "" {
 		clientName = "Client"
@@ -286,8 +279,13 @@ func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input Re
 		input.DocumentName,
 	)
 
+	emailSubject := fmt.Sprintf(
+		"Document required for Kivu Advisory request %s",
+		referenceNumber,
+	)
+
 	emailBody := fmt.Sprintf(
-		"Hello %s,\n\nKivu Advisory requests you to upload a document for your service request.\n\nReference: %s\nRequest title: %s\nRequired document: %s\nUrgency: %s\n\nMessage:\n%s\n\nPlease log in to your client dashboard and upload the requested document.",
+		"Hello %s,\n\nKivu Advisory requests you to upload a document for your service request.\n\nReference: %s\nRequest title: %s\nRequired document: %s\nUrgency: %s\n\nMessage:\n%s\n\nPlease upload the requested document so our team can continue processing your request.",
 		clientName,
 		referenceNumber,
 		strings.TrimSpace(requestContext.Title),
@@ -296,7 +294,75 @@ func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input Re
 		input.Message,
 	)
 
-	_, err = s.notificationService.NotifyUser(ctx, notificationpkg.NotifyUserInput{
+	smsBody := fmt.Sprintf(
+		"Kivu Advisory: please upload %s for request %s.",
+		input.DocumentName,
+		referenceNumber,
+	)
+
+	if recipient.UserID != "" {
+		return s.notifyRegisteredClientForDocumentUpload(
+			ctx,
+			recipient,
+			requestContext,
+			title,
+			body,
+			emailSubject,
+			emailBody,
+			smsBody,
+		)
+	}
+
+	return s.notifyVisitorForDocumentUpload(
+		ctx,
+		recipient,
+		input.ServiceRequestID,
+		emailSubject,
+		emailBody,
+		smsBody,
+	)
+}
+
+func normalizeRequestClientUploadInput(input RequestClientUploadInput) RequestClientUploadInput {
+	input.ServiceRequestID = strings.TrimSpace(input.ServiceRequestID)
+	input.DocumentName = strings.TrimSpace(input.DocumentName)
+	input.Message = strings.TrimSpace(input.Message)
+	input.Urgency = strings.TrimSpace(strings.ToLower(input.Urgency))
+
+	if input.Message == "" {
+		input.Message = "Please upload the requested document so our team can continue processing your service request."
+	}
+
+	if input.Urgency == "" {
+		input.Urgency = "high"
+	}
+
+	return input
+}
+
+func (s *Service) notifyRegisteredClientForDocumentUpload(
+	ctx context.Context,
+	recipient NotificationRecipient,
+	requestContext ServiceRequestNotificationContext,
+	title string,
+	body string,
+	emailSubject string,
+	emailBody string,
+	smsBody string,
+) error {
+	channels := []string{
+		notificationpkg.ChannelInApp,
+	}
+
+	if recipient.Email != "" {
+		channels = append(channels, notificationpkg.ChannelEmail)
+	}
+
+	if recipient.Phone != "" {
+		channels = append(channels, notificationpkg.ChannelSMS)
+	}
+
+	_, err := s.notificationService.NotifyUser(ctx, notificationpkg.NotifyUserInput{
 		UserID:           recipient.UserID,
 		UserEmail:        recipient.Email,
 		UserPhone:        recipient.Phone,
@@ -306,17 +372,47 @@ func (s *Service) RequestClientUpload(ctx context.Context, actor Actor, input Re
 		EntityType:       "service_request",
 		EntityID:         requestContext.ID,
 		ActionURL:        "/client/service-requests",
-		Channels: []string{
-			notificationpkg.ChannelInApp,
-			notificationpkg.ChannelEmail,
-			notificationpkg.ChannelSMS,
-		},
-		EmailSubject: fmt.Sprintf("Document required for Kivu Advisory request %s", referenceNumber),
-		EmailBody:    emailBody,
-		SMSBody:      fmt.Sprintf("Kivu Advisory: please upload %s for request %s. Check your client dashboard.", input.DocumentName, referenceNumber),
+		Channels:         channels,
+		EmailSubject:     emailSubject,
+		EmailBody:        emailBody,
+		SMSBody:          smsBody,
 	})
 	if err != nil {
-		log.Printf("failed to request client document upload for service_request_id=%s: %v", input.ServiceRequestID, err)
+		log.Printf("failed to request client document upload for service_request_id=%s: %v", requestContext.ID, err)
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) notifyVisitorForDocumentUpload(
+	ctx context.Context,
+	recipient NotificationRecipient,
+	serviceRequestID string,
+	emailSubject string,
+	emailBody string,
+	smsBody string,
+) error {
+	channels := make([]string, 0, 2)
+
+	if recipient.Email != "" {
+		channels = append(channels, notificationpkg.ChannelEmail)
+	}
+
+	if recipient.Phone != "" {
+		channels = append(channels, notificationpkg.ChannelSMS)
+	}
+
+	err := s.notificationService.NotifyExternalContact(ctx, notificationpkg.NotifyExternalContactInput{
+		UserEmail:    recipient.Email,
+		UserPhone:    recipient.Phone,
+		Channels:     channels,
+		EmailSubject: emailSubject,
+		EmailBody:    emailBody,
+		SMSBody:      smsBody,
+	})
+	if err != nil {
+		log.Printf("failed to request visitor document upload for service_request_id=%s: %v", serviceRequestID, err)
 		return err
 	}
 
