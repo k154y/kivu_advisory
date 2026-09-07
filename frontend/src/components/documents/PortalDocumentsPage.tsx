@@ -606,11 +606,9 @@ export function PortalDocumentsPage({ role }: PortalDocumentsPageProps) {
 
   return (
     <div>
-      <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-6 lg:flex-row lg:items-center lg:justify-between">
+      <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
-            {role === "client" ? "Client Portal" : "Accountant Portal"}
-          </p>
+         
 
           <h1 className="text-2xl font-bold text-navy">Documents</h1>
 

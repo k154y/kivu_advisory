@@ -239,12 +239,10 @@ export default function ClientRequestsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+      <section >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.28em] text-gold">
-              Client Portal
-            </p>
+            
             <h1 className="mt-2 text-2xl font-bold text-navy">My Requests</h1>
             <p className="mt-1 text-sm text-gray-500">
               View your service requests, documents, and messages in one place.
