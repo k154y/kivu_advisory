@@ -143,12 +143,10 @@ export function NotificationsPage({
 
   return (
     <div>
-      <section className="mb-6 rounded-2xl border border-gray-100 bg-white p-6">
+      <section className="mb-6 ">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-gold">
-              Notification Center
-            </p>
+            
 
             <h1 className="text-2xl font-bold text-navy">{title}</h1>
 

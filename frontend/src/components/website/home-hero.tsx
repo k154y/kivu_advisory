@@ -92,7 +92,7 @@ export function HomeHero() {
       <div className="relative z-10 mx-auto flex min-h-[720px] max-w-7xl items-center px-4 py-24 sm:px-6 lg:px-8">
         <div className="max-w-3xl">
           <div className="mb-6 inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur-sm">
-            Kivu Advisory · Accounting · Tax · Audit · Business Advisory
+            Legal Advisor · Accounting · Tax · Audit · Business Advisory
           </div>
 
           <h1 className="mb-6 text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl">
