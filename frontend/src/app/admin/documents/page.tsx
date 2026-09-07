@@ -230,7 +230,7 @@ export default function AdminDocumentsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4  sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-navy">Documents</h1>
 
