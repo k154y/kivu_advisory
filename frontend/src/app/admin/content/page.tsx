@@ -9,7 +9,7 @@ import {
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
-
+import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { api } from "@/lib/api";
 
 type FieldType = "text" | "textarea";
@@ -592,35 +592,60 @@ export default function AdminContentPage() {
             </div>
           ) : (
             <div className="space-y-5">
-              {section.fields.map((field) => (
-                <div key={field.key}>
-                  <label className="mb-1.5 block text-sm font-medium text-charcoal">
-                    {field.label}
-                  </label>
+            {section.fields.map((field) => {
+  const isHeroImageField =
+    section.contentKey === "home_hero" &&
+    field.key === "image_url";
 
-                  {field.type === "textarea" ? (
-                    <textarea
-                      rows={5}
-                      value={sectionData[field.key] || ""}
-                      onChange={(event) =>
-                        updateField(field.key, event.target.value)
-                      }
-                      placeholder={field.placeholder}
-                      className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/30"
-                    />
-                  ) : (
-                    <input
-                      type="text"
-                      value={sectionData[field.key] || ""}
-                      onChange={(event) =>
-                        updateField(field.key, event.target.value)
-                      }
-                      placeholder={field.placeholder}
-                      className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/30"
-                    />
-                  )}
-                </div>
-              ))}
+  if (isHeroImageField) {
+    return (
+      <div key={field.key}>
+        <ImageUploadField
+          category="hero"
+          value={sectionData.image_url || ""}
+          onChange={(value) =>
+            updateField("image_url", value)
+          }
+          label="Hero Image"
+          urlLabel="Hero Image URL"
+          uploadLabel="Upload hero image"
+          previewAlt="Homepage hero preview"
+          disabled={saving}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div key={field.key}>
+      <label className="mb-1.5 block text-sm font-medium text-charcoal">
+        {field.label}
+      </label>
+
+      {field.type === "textarea" ? (
+        <textarea
+          rows={5}
+          value={sectionData[field.key] || ""}
+          onChange={(event) =>
+            updateField(field.key, event.target.value)
+          }
+          placeholder={field.placeholder}
+          className="w-full resize-none rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/30"
+        />
+      ) : (
+        <input
+          type="text"
+          value={sectionData[field.key] || ""}
+          onChange={(event) =>
+            updateField(field.key, event.target.value)
+          }
+          placeholder={field.placeholder}
+          className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none transition-colors focus:border-teal focus:ring-2 focus:ring-teal/30"
+        />
+      )}
+    </div>
+  );
+})}
 
               <div className="border-t border-gray-100 pt-5">
                 <button

@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 
 import { api } from "@/lib/api";
-
+import { ImageUploadField } from "@/components/admin/image-upload-field";
 type BlogStatus = "draft" | "published" | "archived";
 
 type BlogPost = {
@@ -611,56 +611,18 @@ export default function AdminBlogPage() {
                   className="w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal/30"
                 />
               </div>
+              <ImageUploadField
+  category="blog"
+  value={form.featured_image_url}
+  onChange={(value) => updateField("featured_image_url", value)}
+  label="Featured Image"
+  urlLabel="Featured Image URL"
+  uploadLabel="Upload blog image"
+  previewAlt={form.title || "Blog featured image"}
+  disabled={saving}
+/>
 
-              <div>
-                <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-charcoal">
-                  <ImageIcon size={14} className="text-teal" />
-                  Cover Photo URL
-                </label>
-
-                <div className="flex gap-2">
-                  <input
-                    type="url"
-                    value={form.featured_image_url}
-                    onChange={(event) => {
-                      updateField("featured_image_url", event.target.value);
-                      setPreviewImage(false);
-                    }}
-                    placeholder="https://images.unsplash.com/photo-..."
-                    className="flex-1 rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal/30"
-                  />
-
-                  {form.featured_image_url ? (
-                    <button
-                      type="button"
-                      onClick={() => setPreviewImage((current) => !current)}
-                      className="shrink-0 rounded-lg border border-gray-200 px-3 py-2 text-xs text-gray-600 transition-colors hover:bg-lightgray"
-                    >
-                      {previewImage ? "Hide" : "Preview"}
-                    </button>
-                  ) : null}
-                </div>
-
-                <p className="mt-1.5 text-xs text-gray-400">
-                  Paste a direct image URL from Unsplash, Pexels, or another
-                  hosted image source.
-                </p>
-
-                {previewImage && form.featured_image_url ? (
-                  <div className="mt-2 h-40 overflow-hidden rounded-lg border border-gray-200">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={form.featured_image_url}
-                      alt="Cover preview"
-                      className="h-full w-full object-cover"
-                      onError={() => {
-                        setPreviewImage(false);
-                        toast.error("Could not load image. Check the URL.");
-                      }}
-                    />
-                  </div>
-                ) : null}
-              </div>
+              
 
               <div className="flex items-center justify-between rounded-lg border border-gray-100 bg-lightgray px-3 py-2.5">
                 <div>

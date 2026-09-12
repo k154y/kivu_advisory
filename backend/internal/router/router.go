@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -25,6 +27,7 @@ import (
 	"github.com/kyves/kivu-advisory/backend/internal/content"
 	"github.com/kyves/kivu-advisory/backend/internal/dashboard"
 	"github.com/kyves/kivu-advisory/backend/internal/document"
+	"github.com/kyves/kivu-advisory/backend/internal/media"
 	"github.com/kyves/kivu-advisory/backend/internal/message"
 	"github.com/kyves/kivu-advisory/backend/internal/middleware"
 	"github.com/kyves/kivu-advisory/backend/internal/servicecatalog"
@@ -49,6 +52,7 @@ func New(options Options) http.Handler {
 	tokenVerifier := registerApplicationRoutes(mux, options)
 
 	registerBaseRoutes(mux, options.Config)
+	registerLocalMediaRoute(mux, options.Config)
 	registerPlaceholderRoutes(mux, options.Config, tokenVerifier)
 
 	var handler http.Handler = mux
@@ -93,6 +97,9 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	documentAccessChecker := document.NewAccessChecker(serviceRequestRepository, assignmentRepository)
 	documentNotificationResolver := document.NewPostgresNotificationResolver(options.DatabasePool, options.Config.Admin.Email)
 	documentService := document.NewService(documentRepository, documentStorage, documentAccessChecker)
+
+	mediaStorage := newMediaStorage(options.Config)
+	mediaService := media.NewService(mediaStorage)
 
 	consultationRepository := consultation.NewPostgresRepository(options.DatabasePool)
 	consultationService := consultation.NewService(consultationRepository)
@@ -191,6 +198,7 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 	assignmentHandler := assignment.NewHandler(assignmentService, auditLogService)
 	documentHandler := document.NewHandler(documentService, clientService)
 	consultationHandler := consultation.NewHandler(consultationService, auditLogService)
+	mediaHandler := media.NewHandler(mediaService)
 	messageHandler := message.NewHandler(messageService, clientService)
 	contentHandler := content.NewHandler(contentService)
 	blogHandler := blog.NewHandler(blogService, auditLogService)
@@ -247,6 +255,13 @@ func registerApplicationRoutes(mux *http.ServeMux, options Options) middleware.T
 		mux,
 		options.Config.Server.APIBasePath,
 		documentHandler,
+		tokenManager,
+	)
+
+	media.RegisterRoutes(
+		mux,
+		options.Config.Server.APIBasePath,
+		mediaHandler,
 		tokenManager,
 	)
 
@@ -352,6 +367,35 @@ func registerBaseRoutes(mux *http.ServeMux, cfg *config.Config) {
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		response.NotFound(w, "route not found")
 	})
+}
+
+func registerLocalMediaRoute(mux *http.ServeMux, cfg *config.Config) {
+	if mux == nil || cfg == nil {
+		return
+	}
+
+	// R2 media is served directly from the configured public R2/custom-domain
+	// URL. The backend only serves media files when local storage is active.
+	if cfg.Storage.Driver != config.StorageDriverLocal {
+		return
+	}
+
+	basePath := strings.TrimSpace(cfg.Storage.LocalUploadDir)
+	if basePath == "" {
+		basePath = "tmp/uploads-for-local-development"
+	}
+
+	// Only the website subdirectory is exposed. Other files under the local
+	// upload directory, including private service-request documents, remain
+	// inaccessible through this route.
+	websiteDirectory := filepath.Join(basePath, "website")
+
+	fileServer := http.FileServer(http.Dir(websiteDirectory))
+
+	mux.Handle("/media/website/", http.StripPrefix(
+		"/media/website/",
+		fileServer,
+	))
 }
 
 func registerPlaceholderRoutes(mux *http.ServeMux, cfg *config.Config, tokenVerifier middleware.TokenVerifier) {
@@ -554,6 +598,60 @@ func newDocumentStorage(cfg *config.Config) document.Storage {
 	default:
 		log.Println("document storage: local private storage")
 		return document.NewLocalStorage(cfg.Storage.LocalUploadDir, maxUploadSize)
+	}
+}
+
+func newMediaStorage(cfg *config.Config) media.Storage {
+	if cfg == nil {
+		log.Println("media storage: local website media")
+
+		return media.NewLocalStorage(
+			"tmp/uploads-for-local-development",
+			"",
+			media.DefaultMaxImageSizeBytes,
+		)
+	}
+
+	maxUploadSize := media.DefaultMaxImageSizeBytes
+	if cfg.Upload.MaxSizeBytes > 0 {
+		maxUploadSize = cfg.Upload.MaxSizeBytes
+	}
+
+	switch cfg.Storage.Driver {
+	case config.StorageDriverR2:
+		r2Storage, err := media.NewR2Storage(media.R2StorageConfig{
+			Endpoint:        cfg.Storage.R2.Endpoint,
+			Bucket:          cfg.Storage.R2.BucketName,
+			AccessKeyID:     cfg.Storage.R2.AccessKeyID,
+			SecretAccessKey: cfg.Storage.R2.SecretAccessKey,
+			Region:          cfg.Storage.R2.Region,
+			PublicBaseURL:   cfg.Storage.R2.PublicBaseURL,
+			MaxSizeBytes:    maxUploadSize,
+		})
+		if err != nil {
+			log.Printf(
+				"r2 media storage unavailable, falling back to local storage: %v",
+				err,
+			)
+
+			return media.NewLocalStorage(
+				cfg.Storage.LocalUploadDir,
+				"",
+				maxUploadSize,
+			)
+		}
+
+		log.Println("media storage: cloudflare r2")
+		return r2Storage
+
+	default:
+		log.Println("media storage: local website media")
+
+		return media.NewLocalStorage(
+			cfg.Storage.LocalUploadDir,
+			"",
+			maxUploadSize,
+		)
 	}
 }
 
