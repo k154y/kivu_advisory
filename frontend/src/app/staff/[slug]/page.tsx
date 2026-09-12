@@ -16,6 +16,7 @@ import {
 import { PublicLayout } from "@/components/layout/public-layout";
 import { api } from "@/lib/api";
 import { endpoints } from "@/lib/endpoints";
+import { resolveMediaUrl } from "@/lib/media-url";
 import type { PublicStaffMember } from "@/types/api";
 
 const fallbackStaffMembers: PublicStaffMember[] = [
@@ -189,10 +190,10 @@ export default function StaffDetailPage() {
             <div className="overflow-hidden rounded-2xl bg-white/10 shadow-lg">
               {staff.photo_url ? (
                 <img
-                  src={staff.photo_url}
-                  alt={staff.full_name}
-                  className="h-[420px] w-full object-cover"
-                />
+  src={resolveMediaUrl(staff.photo_url)}
+  alt={staff.full_name}
+  className="h-[420px] w-full object-cover"
+/>
               ) : (
                 <div className="flex h-[420px] w-full items-center justify-center bg-white/10">
                   <UserRound size={90} className="text-white/40" />
