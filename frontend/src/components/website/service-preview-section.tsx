@@ -10,6 +10,7 @@ import {
   FileCheck2,
   Landmark,
   ReceiptText,
+  Scale,
 } from "lucide-react";
 
 import { api } from "@/lib/api";
@@ -34,6 +35,17 @@ type ServiceListResponse = {
   items: PublicService[];
 };
 
+/**
+ * These are the 10 permanent default services.
+ *
+ * Their order represents positions 1 to 10 on the main Services page.
+ *
+ * When the backend contains a service with the same slug,
+ * the backend version overrides the default information.
+ *
+ * New services created by an administrator are added after
+ * these original 10 services.
+ */
 const fallbackServices: PublicService[] = [
   {
     id: "fallback-service-1",
@@ -63,7 +75,7 @@ const fallbackServices: PublicService[] = [
       "Manage staff payroll, deductions, declarations, and monthly reports.",
     category: "Payroll",
     icon_name: "briefcase",
-    is_featured: true,
+    is_featured: false,
   },
   {
     id: "fallback-service-4",
@@ -73,7 +85,7 @@ const fallbackServices: PublicService[] = [
       "Prepare professional financial statements for management, banks, and audits.",
     category: "Reporting",
     icon_name: "chart",
-    is_featured: true,
+    is_featured: false,
   },
   {
     id: "fallback-service-5",
@@ -95,14 +107,123 @@ const fallbackServices: PublicService[] = [
     icon_name: "landmark",
     is_featured: true,
   },
+  {
+    id: "fallback-service-7",
+    name: "Business Plan Preparation",
+    slug: "business-plan",
+    short_description:
+      "Prepare clear business plans for financing, investment, expansion, and management.",
+    category: "Advisory",
+    icon_name: "briefcase",
+    is_featured: false,
+  },
+  {
+    id: "fallback-service-8",
+    name: "RRA Advisory & Compliance",
+    slug: "rra-advisory",
+    short_description:
+      "Receive support with RRA obligations, tax files, declarations, and compliance follow-up.",
+    category: "Tax",
+    icon_name: "receipt",
+    is_featured: false,
+  },
+  {
+    id: "fallback-service-9",
+    name: "RDB Services & Registration",
+    slug: "rdb-services",
+    short_description:
+      "Get support with company registration, updates, documentation, and business formalities.",
+    category: "Registration",
+    icon_name: "landmark",
+    is_featured: true,
+  },
+  {
+    id: "fallback-service-10",
+    name: "Legal Advisor",
+    slug: "legal-advisor",
+    short_description:
+      "Get professional legal guidance on business matters, contracts, compliance, regulatory requirements, and other legal issues affecting your organization.",
+    category: "Legal",
+    icon_name: "scale",
+    is_featured: true,
+  },
 ];
 
-function getServiceItems(data: ServiceListResponse | PublicService[]) {
+function getServiceItems(
+  data: ServiceListResponse | PublicService[],
+): PublicService[] {
   if (Array.isArray(data)) {
     return data;
   }
 
   return data.items || [];
+}
+
+function normalizeSlug(slug?: string) {
+  return slug?.trim().toLowerCase() || "";
+}
+
+/**
+ * Combines the permanent default services with services stored
+ * in the backend.
+ *
+ * Existing default service:
+ * backend version replaces editable information while keeping
+ * its position among the original 10.
+ *
+ * New admin service:
+ * appended after the original 10 services.
+ */
+function mergeServices(
+  apiServices: PublicService[],
+): PublicService[] {
+  const servicesBySlug = new Map<string, PublicService>();
+
+  for (const service of apiServices) {
+    const slug = normalizeSlug(service.slug);
+
+    if (slug) {
+      servicesBySlug.set(slug, service);
+    }
+  }
+
+  const originalServices = fallbackServices.map((fallbackService) => {
+    const backendService = servicesBySlug.get(
+      normalizeSlug(fallbackService.slug),
+    );
+
+    if (!backendService) {
+      return fallbackService;
+    }
+
+    return {
+      ...fallbackService,
+      ...backendService,
+      id: backendService.id || fallbackService.id,
+      slug: backendService.slug || fallbackService.slug,
+    };
+  });
+
+  const originalSlugs = new Set(
+    fallbackServices.map((service) =>
+      normalizeSlug(service.slug),
+    ),
+  );
+
+  const adminAddedServices = apiServices.filter(
+    (service) =>
+      !originalSlugs.has(normalizeSlug(service.slug)),
+  );
+
+  return [...originalServices, ...adminAddedServices];
+}
+
+function getFeaturedServices(
+  services: PublicService[],
+): PublicService[] {
+  return services.filter(
+    (service) => service.is_featured === true,
+  );
 }
 
 function getServiceTitle(service: PublicService) {
@@ -117,26 +238,53 @@ function getServiceDescription(service: PublicService) {
   );
 }
 
-function ServiceIcon({ iconName }: { iconName?: string }) {
+function ServiceIcon({
+  iconName,
+}: {
+  iconName?: string;
+}) {
   const name = iconName?.toLowerCase() || "";
 
-  if (name.includes("receipt") || name.includes("tax")) {
+  if (
+    name.includes("scale") ||
+    name.includes("legal") ||
+    name.includes("law")
+  ) {
+    return <Scale size={26} />;
+  }
+
+  if (
+    name.includes("receipt") ||
+    name.includes("tax")
+  ) {
     return <ReceiptText size={26} />;
   }
 
-  if (name.includes("briefcase") || name.includes("payroll")) {
+  if (
+    name.includes("briefcase") ||
+    name.includes("payroll")
+  ) {
     return <BriefcaseBusiness size={26} />;
   }
 
-  if (name.includes("chart") || name.includes("statement")) {
+  if (
+    name.includes("chart") ||
+    name.includes("statement")
+  ) {
     return <BarChart3 size={26} />;
   }
 
-  if (name.includes("check") || name.includes("audit")) {
+  if (
+    name.includes("check") ||
+    name.includes("audit")
+  ) {
     return <FileCheck2 size={26} />;
   }
 
-  if (name.includes("landmark") || name.includes("business")) {
+  if (
+    name.includes("landmark") ||
+    name.includes("business")
+  ) {
     return <Landmark size={26} />;
   }
 
@@ -144,25 +292,45 @@ function ServiceIcon({ iconName }: { iconName?: string }) {
 }
 
 export function ServicePreviewSection() {
-  const [services, setServices] = useState<PublicService[]>(fallbackServices);
+  const [services, setServices] = useState<PublicService[]>(
+    getFeaturedServices(fallbackServices),
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const loadServices = async () => {
       try {
-        const result = await api.get<ServiceListResponse | PublicService[]>(
-          "/services?page_size=6&is_featured=true",
-        );
+        /**
+         * Important:
+         *
+         * We deliberately request ALL services here instead of:
+         *
+         * /services?page_size=6&is_featured=true
+         *
+         * We need all backend records so that we can correctly
+         * merge admin edits with the permanent original services.
+         */
+        const result = await api.get<
+          ServiceListResponse | PublicService[]
+        >("/services?page_size=100");
 
         const items = getServiceItems(result.data).filter(Boolean);
 
-        if (!cancelled && items.length > 0) {
-          setServices(items.slice(0, 6));
+        if (cancelled) {
+          return;
         }
+
+        const mergedServices = mergeServices(items);
+        const featuredServices =
+          getFeaturedServices(mergedServices);
+
+        setServices(featuredServices);
       } catch {
         if (!cancelled) {
-          setServices(fallbackServices);
+          setServices(
+            getFeaturedServices(fallbackServices),
+          );
         }
       }
     };
@@ -189,8 +357,8 @@ export function ServicePreviewSection() {
 
             <p className="max-w-2xl text-gray-600">
               We support businesses with accounting, tax, payroll, audit,
-              compliance, and advisory services designed to improve control and
-              decision-making.
+              compliance, legal, registration, and advisory services designed
+              to improve control and decision-making.
             </p>
           </div>
 
@@ -211,7 +379,11 @@ export function ServicePreviewSection() {
               className="group rounded-xl border border-gray-100 bg-softwhite p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
             >
               <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-teal-50 text-teal transition-colors group-hover:bg-teal group-hover:text-white">
-                <ServiceIcon iconName={service.icon_name || service.category} />
+                <ServiceIcon
+                  iconName={
+                    service.icon_name || service.category
+                  }
+                />
               </div>
 
               {service.category ? (
@@ -227,6 +399,12 @@ export function ServicePreviewSection() {
               <p className="mb-5 text-sm leading-relaxed text-gray-600">
                 {getServiceDescription(service)}
               </p>
+
+              {service.price_label ? (
+                <p className="mb-5 rounded-lg bg-navy-50 px-3 py-2 text-sm font-semibold text-navy">
+                  {service.price_label}
+                </p>
+              ) : null}
 
               <span className="inline-flex items-center gap-1 text-sm font-semibold text-teal transition-all group-hover:gap-2">
                 Learn More

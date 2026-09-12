@@ -6,6 +6,7 @@ import { ArrowRight, UserRound } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { endpoints } from "@/lib/endpoints";
+import { resolveMediaUrl } from "@/lib/media-url";
 import type { ApiListResult, PublicStaffMember } from "@/types/api";
 
 const fallbackStaffMembers: PublicStaffMember[] = [
@@ -129,10 +130,10 @@ export function StaffPreviewSection() {
               <div className="aspect-[4/3] overflow-hidden bg-gray-100">
                 {member.photo_url ? (
                   <img
-                    src={member.photo_url}
-                    alt={member.full_name}
-                    className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  />
+  src={resolveMediaUrl(member.photo_url)}
+  alt={member.full_name}
+  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+/>
                 ) : (
                   <div className="flex h-full w-full items-center justify-center bg-navy-50">
                     <UserRound size={56} className="text-navy/40" />

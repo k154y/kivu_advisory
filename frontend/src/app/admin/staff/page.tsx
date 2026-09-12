@@ -14,7 +14,8 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
-
+import { ImageUploadField } from "@/components/admin/image-upload-field";
+import { resolveMediaUrl } from "@/lib/media-url";
 import { api } from "@/lib/api";
 
 type StaffMember = {
@@ -429,7 +430,7 @@ export default function AdminStaffPage() {
                         <div className="h-11 w-11 overflow-hidden rounded-full bg-navy-50">
                           {staffMember.photo_url ? (
                             <img
-                              src={staffMember.photo_url}
+                              src={resolveMediaUrl(staffMember.photo_url)}
                               alt={staffMember.full_name}
                               className="h-full w-full object-cover"
                             />
@@ -590,11 +591,18 @@ export default function AdminStaffPage() {
                 />
               </div>
 
-              <TextInput
-                label="Photo URL"
-                value={form.photo_url}
-                onChange={(value) => updateForm("photo_url", value)}
-              />
+              <ImageUploadField
+  category="staff"
+  value={form.photo_url}
+  onChange={(value) =>
+    updateForm("photo_url", value)
+  }
+  label="Staff Photo"
+  urlLabel="Photo URL"
+  uploadLabel="Upload staff photo"
+  previewAlt={form.full_name || "Staff photo preview"}
+  disabled={saving}
+/>
 
               <TextArea
                 label="Short Description"

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ImageIcon, Save } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
-
+import { ImageUploadField } from "@/components/admin/image-upload-field";
 import { api } from "@/lib/api";
 import {
   adminBlogPaths,
@@ -236,32 +236,24 @@ export function BlogPostForm({ mode, initialPost }: BlogPostFormProps) {
           </section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
-            <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-navy">
-              <ImageIcon size={18} />
-              Featured Image
-            </h2>
+  <h2 className="mb-4 flex items-center gap-2 text-lg font-bold text-navy">
+    <ImageIcon size={18} />
+    Featured Image
+  </h2>
 
-            <TextInput
-              label="Image URL"
-              value={form.featured_image_url}
-              onChange={(value) => updateForm("featured_image_url", value)}
-              placeholder="https://..."
-            />
-
-            <div className="mt-4 aspect-[16/10] overflow-hidden rounded-xl bg-lightgray">
-              {form.featured_image_url ? (
-                <img
-                  src={form.featured_image_url}
-                  alt={form.title || "Blog image preview"}
-                  className="h-full w-full object-cover"
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-gray-400">
-                  Image preview
-                </div>
-              )}
-            </div>
-          </section>
+  <ImageUploadField
+    category="blog"
+    value={form.featured_image_url}
+    onChange={(value) =>
+      updateForm("featured_image_url", value)
+    }
+    label="Featured Image"
+    urlLabel="Featured Image URL"
+    uploadLabel="Upload blog image"
+    previewAlt={form.title || "Blog featured image"}
+    disabled={isSaving}
+  />
+</section>
 
           <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-bold text-navy">Quick Preview</h2>
