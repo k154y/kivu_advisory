@@ -172,81 +172,81 @@ func Load() (*Config, error) {
 			BcryptCost: getIntEnv("BCRYPT_COST", 12),
 		},
 		Storage: StorageConfig{
-	LocalUploadDir: getEnv(
-		"LOCAL_UPLOAD_DIR",
-		"tmp/uploads-for-local-development",
-	),
+			LocalUploadDir: getEnv(
+				"LOCAL_UPLOAD_DIR",
+				"tmp/uploads-for-local-development",
+			),
 
-	Documents: StorageTargetConfig{
-		Driver: getEnv(
-			"DOCUMENT_STORAGE_DRIVER",
-			StorageDriverLocal,
-		),
-		R2: R2Config{
-			AccountID: getEnv(
-				"DOCUMENT_R2_ACCOUNT_ID",
-				"",
-			),
-			AccessKeyID: getEnv(
-				"DOCUMENT_R2_ACCESS_KEY_ID",
-				"",
-			),
-			SecretAccessKey: getEnv(
-				"DOCUMENT_R2_SECRET_ACCESS_KEY",
-				"",
-			),
-			BucketName: getEnv(
-				"DOCUMENT_R2_BUCKET_NAME",
-				"",
-			),
-			Endpoint: getEnv(
-				"DOCUMENT_R2_ENDPOINT",
-				"",
-			),
-			Region: getEnv(
-				"DOCUMENT_R2_REGION",
-				"auto",
-			),
-		},
-	},
+			Documents: StorageTargetConfig{
+				Driver: getEnv(
+					"DOCUMENT_STORAGE_DRIVER",
+					StorageDriverLocal,
+				),
+				R2: R2Config{
+					AccountID: getEnv(
+						"DOCUMENT_R2_ACCOUNT_ID",
+						"",
+					),
+					AccessKeyID: getEnv(
+						"DOCUMENT_R2_ACCESS_KEY_ID",
+						"",
+					),
+					SecretAccessKey: getEnv(
+						"DOCUMENT_R2_SECRET_ACCESS_KEY",
+						"",
+					),
+					BucketName: getEnv(
+						"DOCUMENT_R2_BUCKET_NAME",
+						"",
+					),
+					Endpoint: getEnv(
+						"DOCUMENT_R2_ENDPOINT",
+						"",
+					),
+					Region: getEnv(
+						"DOCUMENT_R2_REGION",
+						"auto",
+					),
+				},
+			},
 
-	Media: StorageTargetConfig{
-		Driver: getEnv(
-			"MEDIA_STORAGE_DRIVER",
-			StorageDriverLocal,
-		),
-		R2: R2Config{
-			AccountID: getEnv(
-				"MEDIA_R2_ACCOUNT_ID",
-				"",
-			),
-			AccessKeyID: getEnv(
-				"MEDIA_R2_ACCESS_KEY_ID",
-				"",
-			),
-			SecretAccessKey: getEnv(
-				"MEDIA_R2_SECRET_ACCESS_KEY",
-				"",
-			),
-			BucketName: getEnv(
-				"MEDIA_R2_BUCKET_NAME",
-				"",
-			),
-			Endpoint: getEnv(
-				"MEDIA_R2_ENDPOINT",
-				"",
-			),
-			Region: getEnv(
-				"MEDIA_R2_REGION",
-				"auto",
-			),
-			PublicBaseURL: getEnv(
-				"MEDIA_R2_PUBLIC_BASE_URL",
-				"",
-			),
+			Media: StorageTargetConfig{
+				Driver: getEnv(
+					"MEDIA_STORAGE_DRIVER",
+					StorageDriverLocal,
+				),
+				R2: R2Config{
+					AccountID: getEnv(
+						"MEDIA_R2_ACCOUNT_ID",
+						"",
+					),
+					AccessKeyID: getEnv(
+						"MEDIA_R2_ACCESS_KEY_ID",
+						"",
+					),
+					SecretAccessKey: getEnv(
+						"MEDIA_R2_SECRET_ACCESS_KEY",
+						"",
+					),
+					BucketName: getEnv(
+						"MEDIA_R2_BUCKET_NAME",
+						"",
+					),
+					Endpoint: getEnv(
+						"MEDIA_R2_ENDPOINT",
+						"",
+					),
+					Region: getEnv(
+						"MEDIA_R2_REGION",
+						"auto",
+					),
+					PublicBaseURL: getEnv(
+						"MEDIA_R2_PUBLIC_BASE_URL",
+						"",
+					),
+				},
+			},
 		},
-	},
-},
 		Upload: UploadConfig{
 			MaxSizeMB:         getIntEnv("MAX_UPLOAD_SIZE_MB", 20),
 			AllowedExtensions: getCSVEnv("ALLOWED_UPLOAD_EXTENSIONS", "pdf,doc,docx,xls,xlsx,png,jpg,jpeg"),
@@ -316,125 +316,125 @@ func (c *Config) Validate() error {
 	}
 
 	storageTargets := []struct {
-	name             string
-	envPrefix        string
-	config           StorageTargetConfig
-	requirePublicURL bool
-}{
-	{
-		name:             "document",
-		envPrefix:        "DOCUMENT",
-		config:           c.Storage.Documents,
-		requirePublicURL: false,
-	},
-	{
-		name:             "media",
-		envPrefix:        "MEDIA",
-		config:           c.Storage.Media,
-		requirePublicURL: true,
-	},
-}
-
-for _, target := range storageTargets {
-	if !isAllowed(
-		target.config.Driver,
-		StorageDriverLocal,
-		StorageDriverR2,
-	) {
-		validationErrors = append(
-			validationErrors,
-			fmt.Errorf(
-				"%s_STORAGE_DRIVER must be one of: %s, %s",
-				target.envPrefix,
-				StorageDriverLocal,
-				StorageDriverR2,
-			),
-		)
-
-		continue
+		name             string
+		envPrefix        string
+		config           StorageTargetConfig
+		requirePublicURL bool
+	}{
+		{
+			name:             "document",
+			envPrefix:        "DOCUMENT",
+			config:           c.Storage.Documents,
+			requirePublicURL: false,
+		},
+		{
+			name:             "media",
+			envPrefix:        "MEDIA",
+			config:           c.Storage.Media,
+			requirePublicURL: true,
+		},
 	}
 
-	if target.config.Driver != StorageDriverR2 {
-		continue
-	}
+	for _, target := range storageTargets {
+		if !isAllowed(
+			target.config.Driver,
+			StorageDriverLocal,
+			StorageDriverR2,
+		) {
+			validationErrors = append(
+				validationErrors,
+				fmt.Errorf(
+					"%s_STORAGE_DRIVER must be one of: %s, %s",
+					target.envPrefix,
+					StorageDriverLocal,
+					StorageDriverR2,
+				),
+			)
 
-	if strings.TrimSpace(target.config.R2.Endpoint) == "" {
-		validationErrors = append(
-			validationErrors,
-			fmt.Errorf(
-				"%s_R2_ENDPOINT is required when %s_STORAGE_DRIVER=r2",
-				target.envPrefix,
-				target.envPrefix,
-			),
-		)
-	}
+			continue
+		}
 
-	if strings.TrimSpace(target.config.R2.BucketName) == "" {
-		validationErrors = append(
-			validationErrors,
-			fmt.Errorf(
-				"%s_R2_BUCKET_NAME is required when %s_STORAGE_DRIVER=r2",
-				target.envPrefix,
-				target.envPrefix,
-			),
-		)
-	}
+		if target.config.Driver != StorageDriverR2 {
+			continue
+		}
 
-	if strings.TrimSpace(target.config.R2.AccessKeyID) == "" {
-		validationErrors = append(
-			validationErrors,
-			fmt.Errorf(
-				"%s_R2_ACCESS_KEY_ID is required when %s_STORAGE_DRIVER=r2",
-				target.envPrefix,
-				target.envPrefix,
-			),
-		)
-	}
+		if strings.TrimSpace(target.config.R2.Endpoint) == "" {
+			validationErrors = append(
+				validationErrors,
+				fmt.Errorf(
+					"%s_R2_ENDPOINT is required when %s_STORAGE_DRIVER=r2",
+					target.envPrefix,
+					target.envPrefix,
+				),
+			)
+		}
 
-	if strings.TrimSpace(target.config.R2.SecretAccessKey) == "" {
-		validationErrors = append(
-			validationErrors,
-			fmt.Errorf(
-				"%s_R2_SECRET_ACCESS_KEY is required when %s_STORAGE_DRIVER=r2",
-				target.envPrefix,
-				target.envPrefix,
-			),
-		)
-	}
+		if strings.TrimSpace(target.config.R2.BucketName) == "" {
+			validationErrors = append(
+				validationErrors,
+				fmt.Errorf(
+					"%s_R2_BUCKET_NAME is required when %s_STORAGE_DRIVER=r2",
+					target.envPrefix,
+					target.envPrefix,
+				),
+			)
+		}
 
-	if target.requirePublicURL &&
-		strings.TrimSpace(target.config.R2.PublicBaseURL) == "" {
-		validationErrors = append(
-			validationErrors,
-			fmt.Errorf(
-				"%s_R2_PUBLIC_BASE_URL is required when %s_STORAGE_DRIVER=r2",
-				target.envPrefix,
-				target.envPrefix,
-			),
-		)
+		if strings.TrimSpace(target.config.R2.AccessKeyID) == "" {
+			validationErrors = append(
+				validationErrors,
+				fmt.Errorf(
+					"%s_R2_ACCESS_KEY_ID is required when %s_STORAGE_DRIVER=r2",
+					target.envPrefix,
+					target.envPrefix,
+				),
+			)
+		}
+
+		if strings.TrimSpace(target.config.R2.SecretAccessKey) == "" {
+			validationErrors = append(
+				validationErrors,
+				fmt.Errorf(
+					"%s_R2_SECRET_ACCESS_KEY is required when %s_STORAGE_DRIVER=r2",
+					target.envPrefix,
+					target.envPrefix,
+				),
+			)
+		}
+
+		if target.requirePublicURL &&
+			strings.TrimSpace(target.config.R2.PublicBaseURL) == "" {
+			validationErrors = append(
+				validationErrors,
+				fmt.Errorf(
+					"%s_R2_PUBLIC_BASE_URL is required when %s_STORAGE_DRIVER=r2",
+					target.envPrefix,
+					target.envPrefix,
+				),
+			)
+		}
 	}
-}
 
 	if c.IsProduction() {
 		if c.App.Env == EnvStaging {
-	if c.Storage.Documents.Driver != StorageDriverR2 {
-		validationErrors = append(
-			validationErrors,
-			errors.New(
-				"staging must use DOCUMENT_STORAGE_DRIVER=r2",
-			),
-		)
-	}
+			if c.Storage.Documents.Driver != StorageDriverR2 {
+				validationErrors = append(
+					validationErrors,
+					errors.New(
+						"staging must use DOCUMENT_STORAGE_DRIVER=r2",
+					),
+				)
+			}
 
-	if c.Storage.Media.Driver != StorageDriverR2 {
-		validationErrors = append(
-			validationErrors,
-			errors.New(
-				"staging must use MEDIA_STORAGE_DRIVER=r2",
-			),
-		)
-	}
-}
+			if c.Storage.Media.Driver != StorageDriverR2 {
+				validationErrors = append(
+					validationErrors,
+					errors.New(
+						"staging must use MEDIA_STORAGE_DRIVER=r2",
+					),
+				)
+			}
+		}
 		if strings.TrimSpace(c.Database.URL) == "" {
 			validationErrors = append(validationErrors, errors.New("DATABASE_URL is required in production"))
 		}
@@ -448,22 +448,22 @@ for _, target := range storageTargets {
 		}
 
 		if c.Storage.Documents.Driver != StorageDriverR2 {
-	validationErrors = append(
-		validationErrors,
-		errors.New(
-			"production must use DOCUMENT_STORAGE_DRIVER=r2",
-		),
-	)
-}
+			validationErrors = append(
+				validationErrors,
+				errors.New(
+					"production must use DOCUMENT_STORAGE_DRIVER=r2",
+				),
+			)
+		}
 
-if c.Storage.Media.Driver != StorageDriverR2 {
-	validationErrors = append(
-		validationErrors,
-		errors.New(
-			"production must use MEDIA_STORAGE_DRIVER=r2",
-		),
-	)
-}
+		if c.Storage.Media.Driver != StorageDriverR2 {
+			validationErrors = append(
+				validationErrors,
+				errors.New(
+					"production must use MEDIA_STORAGE_DRIVER=r2",
+				),
+			)
+		}
 	}
 
 	return errors.Join(validationErrors...)

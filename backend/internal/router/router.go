@@ -376,9 +376,9 @@ func registerLocalMediaRoute(mux *http.ServeMux, cfg *config.Config) {
 
 	// R2 media is served directly from the configured public R2/custom-domain
 	// URL. The backend only serves media files when local storage is active.
-if cfg.Storage.Media.Driver != config.StorageDriverLocal {
-	return
-}
+	if cfg.Storage.Media.Driver != config.StorageDriverLocal {
+		return
+	}
 
 	basePath := strings.TrimSpace(cfg.Storage.LocalUploadDir)
 	if basePath == "" {
