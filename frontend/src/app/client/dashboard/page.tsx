@@ -329,7 +329,7 @@ export default function ClientDashboardPage() {
           <div className="flex flex-col gap-3 sm:w-auto sm:min-w-[230px]">
             <Link
               href={routes.requestService}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-navy px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-navy-700"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl border border-teal/20 bg-teal/10 px-5 py-3 text-sm font-semibold text-teal hover:bg-teal hover:text-white"
             >
               <Plus size={18} />
               New Request

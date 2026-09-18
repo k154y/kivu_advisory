@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, CalendarCheck } from "lucide-react";
-
+import { resolveMediaUrl } from "@/lib/media-url";
 import { getWebsiteContentBlock } from "@/lib/website-content";
 
 const fallbackHero = {
@@ -45,7 +45,11 @@ export function HomeHero() {
 
       setTitle(block.title || fallbackHero.title);
       setDescription(block.summary || block.body || fallbackHero.description);
-      setMainImage(block.image_url || fallbackHero.image);
+      setMainImage(
+  block.image_url
+    ? resolveMediaUrl(block.image_url)
+    : fallbackHero.image,
+);
       setButtonLabel(block.button_label || fallbackHero.buttonLabel);
       setButtonUrl(block.button_url || fallbackHero.buttonUrl);
     };

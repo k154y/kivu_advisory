@@ -10,6 +10,7 @@ import {
   FileCheck2,
   Landmark,
   ReceiptText,
+  Scale,
 } from "lucide-react";
 
 import { PublicLayout } from "@/components/layout/public-layout";
@@ -124,6 +125,16 @@ const fallbackServices: PublicService[] = [
       "Get support with company registration, updates, documentation, and business formalities.",
     category: "Registration",
     icon_name: "landmark",
+    is_featured: true,
+  },
+  {
+    id: "fallback-service-10",
+    name: "Legal Advisor",
+    slug: "legal-advisor",
+    short_description:
+      "Get professional legal guidance on business matters, contracts, compliance, regulatory requirements, and other legal issues affecting your organization.",
+    category: "Legal",
+    icon_name: "scale",
     is_featured: false,
   },
 ];
@@ -134,6 +145,61 @@ function getServiceItems(data: ServiceListResponse | PublicService[]) {
   }
 
   return data.items || [];
+}
+
+function normalizeSlug(slug?: string) {
+  return slug?.trim().toLowerCase() || "";
+}
+
+/**
+ * Keeps the original 10 services permanently.
+ *
+ * If the backend contains a service with the same slug as one of the
+ * original services, the backend version is treated as the admin-edited
+ * version and overrides the fallback values.
+ *
+ * Services created by the admin with new slugs are appended after the
+ * original 10 services.
+ */
+function mergeServices(
+  apiServices: PublicService[],
+): PublicService[] {
+  const servicesBySlug = new Map<string, PublicService>();
+
+  for (const service of apiServices) {
+    const slug = normalizeSlug(service.slug);
+
+    if (slug) {
+      servicesBySlug.set(slug, service);
+    }
+  }
+
+  const originalServices = fallbackServices.map((fallbackService) => {
+    const backendService = servicesBySlug.get(
+      normalizeSlug(fallbackService.slug),
+    );
+
+    if (!backendService) {
+      return fallbackService;
+    }
+
+    return {
+      ...fallbackService,
+      ...backendService,
+      id: backendService.id || fallbackService.id,
+      slug: backendService.slug || fallbackService.slug,
+    };
+  });
+
+  const originalSlugs = new Set(
+    fallbackServices.map((service) => normalizeSlug(service.slug)),
+  );
+
+  const adminAddedServices = apiServices.filter(
+    (service) => !originalSlugs.has(normalizeSlug(service.slug)),
+  );
+
+  return [...originalServices, ...adminAddedServices];
 }
 
 function getServiceTitle(service: PublicService) {
@@ -150,6 +216,14 @@ function getServiceDescription(service: PublicService) {
 
 function ServiceIcon({ iconName }: { iconName?: string }) {
   const name = iconName?.toLowerCase() || "";
+
+  if (
+    name.includes("scale") ||
+    name.includes("legal") ||
+    name.includes("law")
+  ) {
+    return <Scale size={28} />;
+  }
 
   if (name.includes("receipt") || name.includes("tax")) {
     return <ReceiptText size={28} />;
@@ -175,21 +249,22 @@ function ServiceIcon({ iconName }: { iconName?: string }) {
 }
 
 export default function ServicesPage() {
-  const [services, setServices] = useState<PublicService[]>(fallbackServices);
+  const [services, setServices] =
+    useState<PublicService[]>(fallbackServices);
 
   useEffect(() => {
     let cancelled = false;
 
     const loadServices = async () => {
       try {
-        const result = await api.get<ServiceListResponse | PublicService[]>(
-          "/services?page_size=100",
-        );
+        const result = await api.get<
+          ServiceListResponse | PublicService[]
+        >("/services?page_size=100");
 
         const items = getServiceItems(result.data).filter(Boolean);
 
-        if (!cancelled && items.length > 0) {
-          setServices(items);
+        if (!cancelled) {
+          setServices(mergeServices(items));
         }
       } catch {
         if (!cancelled) {
@@ -234,7 +309,9 @@ export default function ServicesPage() {
                 className="group rounded-xl border border-gray-100 bg-softwhite p-6 shadow-sm transition-all duration-200 hover:-translate-y-1 hover:shadow-lg"
               >
                 <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-teal-50 text-teal transition-colors group-hover:bg-teal group-hover:text-white">
-                  <ServiceIcon iconName={service.icon_name || service.category} />
+                  <ServiceIcon
+                    iconName={service.icon_name || service.category}
+                  />
                 </div>
 
                 {service.category ? (

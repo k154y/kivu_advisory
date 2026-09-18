@@ -243,6 +243,56 @@ const fallbackServices: ServiceDetail[] = [
     ],
   },
   {
+  id: "fallback-service-10",
+  name: "Legal Advisor",
+  slug: "legal-advisor",
+  short_description:
+    "Get professional legal guidance on business matters, contracts, compliance, regulatory requirements, and other legal issues affecting your organization.",
+  description:
+    "We provide practical legal advisory support to businesses, organizations, and individuals on contracts, corporate matters, regulatory compliance, business transactions, legal documentation, and other matters requiring professional legal guidance.",
+  category: "Legal",
+  icon_name: "scale",
+  delivery_time: "Depending on the legal matter",
+  price_label: "Quotation after case review",
+
+  what_is_included: [
+    "Legal consultation and advisory",
+    "Contract review and drafting",
+    "Business and corporate legal guidance",
+    "Regulatory and compliance review",
+    "Review of legal documents",
+    "Legal risk identification",
+    "Recommendations on appropriate legal actions",
+  ],
+
+  who_needs_this: [
+    "Businesses requiring legal guidance",
+    "Companies reviewing or preparing contracts",
+    "Entrepreneurs starting or restructuring businesses",
+    "Organizations dealing with regulatory requirements",
+    "Clients involved in commercial or contractual matters",
+    "Management teams requiring legal risk assessment",
+  ],
+
+  key_benefits: [
+    "Better protection of business interests",
+    "Reduced legal and contractual risks",
+    "Improved regulatory compliance",
+    "Clearer contracts and legal documentation",
+    "Better-informed business decisions",
+    "Professional guidance before important transactions",
+  ],
+
+  required_documents: [
+    "Identification or company registration documents",
+    "Contracts or agreements related to the matter",
+    "Relevant correspondence",
+    "Licences or regulatory documents where applicable",
+    "Company records where applicable",
+    "Any supporting documents related to the legal matter",
+  ],
+},
+  {
     id: "fallback-service-6",
     name: "Business Advisory",
     slug: "business-advisory",
