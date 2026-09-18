@@ -376,9 +376,9 @@ func registerLocalMediaRoute(mux *http.ServeMux, cfg *config.Config) {
 
 	// R2 media is served directly from the configured public R2/custom-domain
 	// URL. The backend only serves media files when local storage is active.
-	if cfg.Storage.Driver != config.StorageDriverLocal {
-		return
-	}
+if cfg.Storage.Media.Driver != config.StorageDriverLocal {
+	return
+}
 
 	basePath := strings.TrimSpace(cfg.Storage.LocalUploadDir)
 	if basePath == "" {
@@ -569,35 +569,62 @@ func methodOnly(method string, handler http.HandlerFunc) http.HandlerFunc {
 func newDocumentStorage(cfg *config.Config) document.Storage {
 	if cfg == nil {
 		log.Println("document storage: local private storage")
-		return document.NewLocalStorage("", document.DefaultMaxUploadSizeBytes)
+
+		return document.NewLocalStorage(
+			"",
+			document.DefaultMaxUploadSizeBytes,
+		)
 	}
 
 	maxUploadSize := document.DefaultMaxUploadSizeBytes
+
 	if cfg.Upload.MaxSizeBytes > 0 {
 		maxUploadSize = cfg.Upload.MaxSizeBytes
 	}
 
-	switch cfg.Storage.Driver {
+	switch cfg.Storage.Documents.Driver {
 	case config.StorageDriverR2:
-		r2Storage, err := document.NewR2Storage(document.R2StorageConfig{
-			Endpoint:        cfg.Storage.R2.Endpoint,
-			Bucket:          cfg.Storage.R2.BucketName,
-			AccessKeyID:     cfg.Storage.R2.AccessKeyID,
-			SecretAccessKey: cfg.Storage.R2.SecretAccessKey,
-			Region:          cfg.Storage.R2.Region,
-			MaxSizeBytes:    maxUploadSize,
-		})
+		r2Config := cfg.Storage.Documents.R2
+
+		r2Storage, err := document.NewR2Storage(
+			document.R2StorageConfig{
+				Endpoint:        r2Config.Endpoint,
+				Bucket:          r2Config.BucketName,
+				AccessKeyID:     r2Config.AccessKeyID,
+				SecretAccessKey: r2Config.SecretAccessKey,
+				Region:          r2Config.Region,
+				MaxSizeBytes:    maxUploadSize,
+			},
+		)
 		if err != nil {
-			log.Printf("r2 storage unavailable, falling back to local storage: %v", err)
-			return document.NewLocalStorage(cfg.Storage.LocalUploadDir, maxUploadSize)
+			log.Panicf(
+				"document storage: configured R2 storage could not be initialized: %v",
+				err,
+			)
 		}
 
-		log.Println("document storage: cloudflare r2")
+		log.Printf(
+			"document storage: cloudflare r2 private bucket %q",
+			r2Config.BucketName,
+		)
+
 		return r2Storage
 
-	default:
+	case config.StorageDriverLocal:
 		log.Println("document storage: local private storage")
-		return document.NewLocalStorage(cfg.Storage.LocalUploadDir, maxUploadSize)
+
+		return document.NewLocalStorage(
+			cfg.Storage.LocalUploadDir,
+			maxUploadSize,
+		)
+
+	default:
+		log.Panicf(
+			"document storage: unsupported driver %q",
+			cfg.Storage.Documents.Driver,
+		)
+
+		return nil
 	}
 }
 
@@ -613,38 +640,41 @@ func newMediaStorage(cfg *config.Config) media.Storage {
 	}
 
 	maxUploadSize := media.DefaultMaxImageSizeBytes
+
 	if cfg.Upload.MaxSizeBytes > 0 {
 		maxUploadSize = cfg.Upload.MaxSizeBytes
 	}
 
-	switch cfg.Storage.Driver {
+	switch cfg.Storage.Media.Driver {
 	case config.StorageDriverR2:
-		r2Storage, err := media.NewR2Storage(media.R2StorageConfig{
-			Endpoint:        cfg.Storage.R2.Endpoint,
-			Bucket:          cfg.Storage.R2.BucketName,
-			AccessKeyID:     cfg.Storage.R2.AccessKeyID,
-			SecretAccessKey: cfg.Storage.R2.SecretAccessKey,
-			Region:          cfg.Storage.R2.Region,
-			PublicBaseURL:   cfg.Storage.R2.PublicBaseURL,
-			MaxSizeBytes:    maxUploadSize,
-		})
-		if err != nil {
-			log.Printf(
-				"r2 media storage unavailable, falling back to local storage: %v",
-				err,
-			)
+		r2Config := cfg.Storage.Media.R2
 
-			return media.NewLocalStorage(
-				cfg.Storage.LocalUploadDir,
-				"",
-				maxUploadSize,
+		r2Storage, err := media.NewR2Storage(
+			media.R2StorageConfig{
+				Endpoint:        r2Config.Endpoint,
+				Bucket:          r2Config.BucketName,
+				AccessKeyID:     r2Config.AccessKeyID,
+				SecretAccessKey: r2Config.SecretAccessKey,
+				Region:          r2Config.Region,
+				PublicBaseURL:   r2Config.PublicBaseURL,
+				MaxSizeBytes:    maxUploadSize,
+			},
+		)
+		if err != nil {
+			log.Panicf(
+				"media storage: configured R2 storage could not be initialized: %v",
+				err,
 			)
 		}
 
-		log.Println("media storage: cloudflare r2")
+		log.Printf(
+			"media storage: cloudflare r2 public bucket %q",
+			r2Config.BucketName,
+		)
+
 		return r2Storage
 
-	default:
+	case config.StorageDriverLocal:
 		log.Println("media storage: local website media")
 
 		return media.NewLocalStorage(
@@ -652,6 +682,14 @@ func newMediaStorage(cfg *config.Config) media.Storage {
 			"",
 			maxUploadSize,
 		)
+
+	default:
+		log.Panicf(
+			"media storage: unsupported driver %q",
+			cfg.Storage.Media.Driver,
+		)
+
+		return nil
 	}
 }
 
